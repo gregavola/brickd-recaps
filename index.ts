@@ -5,6 +5,7 @@ import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import {
   getAudienceForMonthlyRecaps,
+  getAudienceForMonthlyRecapTest,
   getGlobalBuiltStats,
   getTopUserActivity,
   getTotalPieceCountForUserWithRange,
@@ -20,6 +21,7 @@ import {
 import prisma from "./db";
 import s3 from "./s3";
 import { ObjectCannedACL, PutObjectCommand } from "@aws-sdk/client-s3";
+import { debug } from "console";
 
 export interface GlobalStats {
   totalPieces: number;
@@ -88,7 +90,7 @@ const getUserRecaps = async ({
     },
   });
 
-  debugLog(`Start: ${new Date().toISOString()}`);
+  console.log(`Start: ${new Date().toISOString()}`);
 
   if (!timeZone) {
     throw new Error("User Not Found");
@@ -103,12 +105,12 @@ const getUserRecaps = async ({
     { keepLocalTime: true }
   );
 
-  debugLog(
+  console.log(
     `User Local Start Time: ${userStartTime.toFormat(
       "yyyy-MM-dd HH:mm:ss ZZZZ"
     )}`
   );
-  debugLog(
+  console.log(
     `User Local End Time: ${userEndTime.toFormat("yyyy-MM-dd HH:mm:ss ZZZZ")}`
   );
 
@@ -134,7 +136,7 @@ const getUserRecaps = async ({
     },
   });
 
-  debugLog(`brickd_User.findFirst: ${new Date().toISOString()}`);
+  console.log(`brickd_User.findFirst: ${new Date().toISOString()}`);
 
   if (!user) {
     throw new Error("Invalid User");
@@ -169,7 +171,9 @@ const getUserRecaps = async ({
     },
   });
 
-  debugLog(`brickd_UserCollectionItem.findMany: ${new Date().toISOString()}`);
+  console.log(
+    `brickd_UserCollectionItem.findMany: ${new Date().toISOString()}`
+  );
 
   // Total Sets Added
   const totalCollectionsCreated = await prisma.brickd_UserCollection.count({
@@ -183,7 +187,7 @@ const getUserRecaps = async ({
     },
   });
 
-  debugLog(`brickd_UserCollection.count: ${new Date().toISOString()}`);
+  console.log(`brickd_UserCollection.count: ${new Date().toISOString()}`);
 
   const totalCollectionTypes = await prisma.brickd_UserCollection.groupBy({
     by: "collectionType",
@@ -200,7 +204,7 @@ const getUserRecaps = async ({
     },
   });
 
-  debugLog(`brickd_UserCollection.groupBy: ${new Date().toISOString()}`);
+  console.log(`brickd_UserCollection.groupBy: ${new Date().toISOString()}`);
 
   // Minifigs
 
@@ -211,7 +215,7 @@ const getUserRecaps = async ({
       },
     });
 
-  debugLog(
+  console.log(
     `brickd_UserCollectionMinifigItem.count: ${new Date().toISOString()}`
   );
 
@@ -231,7 +235,7 @@ const getUserRecaps = async ({
       },
     });
 
-  debugLog(
+  console.log(
     `brickd_UserCollectionMinifigItem.count (total): ${new Date().toISOString()}`
   );
 
@@ -251,7 +255,7 @@ const getUserRecaps = async ({
     },
   });
 
-  debugLog(
+  console.log(
     `brickd_UserCollectionItem.count (added): ${new Date().toISOString()}`
   );
 
@@ -272,7 +276,7 @@ const getUserRecaps = async ({
     },
   });
 
-  debugLog(
+  console.log(
     `brickd_UserCollectionItem.count (built): ${new Date().toISOString()}`
   );
 
@@ -280,7 +284,7 @@ const getUserRecaps = async ({
     getUserStreakThisMonth(userId, startDate, endDate)
   );
 
-  debugLog(`userStreak.custom: ${new Date().toISOString()}`);
+  console.log(`userStreak.custom: ${new Date().toISOString()}`);
 
   const builtSets = await prisma.brickd_UserCollectionItem.findMany({
     select: {
@@ -335,7 +339,9 @@ const getUserRecaps = async ({
     take: 5,
   });
 
-  debugLog(`brickd_UserCollectionItem.findMany: ${new Date().toISOString()}`);
+  console.log(
+    `brickd_UserCollectionItem.findMany: ${new Date().toISOString()}`
+  );
 
   const sets = builtSets.map((subItem) => {
     subItem.set.setImageUrl = getCloudFrontSetImage(
@@ -353,7 +359,9 @@ const getUserRecaps = async ({
     getUnqiueLocationCountForUser(userId, startDate, endDate)
   );
 
-  debugLog(`getUnqiueLocationCountForUser.custom: ${new Date().toISOString()}`);
+  console.log(
+    `getUnqiueLocationCountForUser.custom: ${new Date().toISOString()}`
+  );
 
   // const totalLocationsUnique = await prisma.brickd_UserCollectionItem.findMany({
   //   where: {
@@ -388,7 +396,7 @@ const getUserRecaps = async ({
     getUserTopLocations(userId, startDate, endDate, 5)
   );
 
-  debugLog(`getUserTopLocations.custom: ${new Date().toISOString()}`);
+  console.log(`getUserTopLocations.custom: ${new Date().toISOString()}`);
 
   // Total Sets Built
 
@@ -396,7 +404,7 @@ const getUserRecaps = async ({
     getTotalPieceCountForUserWithRange(startDate, endDate, userId)
   );
 
-  debugLog(
+  console.log(
     `getTotalPieceCountForUserWithRange.custom: ${new Date().toISOString()}`
   );
 
@@ -436,7 +444,7 @@ const getUserRecaps = async ({
       },
     });
 
-  debugLog(
+  console.log(
     `brickd_UserCollection.count (wishlist): ${new Date().toISOString()}`
   );
 
@@ -454,7 +462,7 @@ const getUserRecaps = async ({
     },
   });
 
-  debugLog(
+  console.log(
     `brickd_UserCollectionItem.count (wishlist added): ${new Date().toISOString()}`
   );
 
@@ -469,13 +477,15 @@ const getUserRecaps = async ({
     },
   });
 
-  debugLog(`brickd_DeleteCollectionItemLog.count: ${new Date().toISOString()}`);
+  console.log(
+    `brickd_DeleteCollectionItemLog.count: ${new Date().toISOString()}`
+  );
 
   const countData = await prisma.$queryRawTyped(
     getUserRecapStandardStats(userId, startDate, endDate)
   );
 
-  debugLog(`getUserRecapStandardStats.custom: ${new Date().toISOString()}`);
+  console.log(`getUserRecapStandardStats.custom: ${new Date().toISOString()}`);
 
   const totalActivities =
     countData.length !== 0 ? Number(countData[0].user_activity_count || 0) : 0;
@@ -526,13 +536,17 @@ const getUserRecaps = async ({
     getUserTopActivityTypesByDate(userId, startDate, endDate)
   );
 
-  debugLog(`getUserTopActivityTypesByDate.custom: ${new Date().toISOString()}`);
+  console.log(
+    `getUserTopActivityTypesByDate.custom: ${new Date().toISOString()}`
+  );
 
   const totalMediaTypes = await prisma.$queryRawTyped(
     getUserTopMediaTypesByDates(userId, startDate, endDate)
   );
 
-  debugLog(`getUserTopMediaTypesByDates.custom: ${new Date().toISOString()}`);
+  console.log(
+    `getUserTopMediaTypesByDates.custom: ${new Date().toISOString()}`
+  );
 
   // top 5 themes
 
@@ -540,13 +554,15 @@ const getUserRecaps = async ({
     getUserTopThemes(userId, startDate, endDate, 5)
   );
 
-  debugLog(`getUserTopMediaTypesByDates.custom: ${new Date().toISOString()}`);
+  console.log(
+    `getUserTopMediaTypesByDates.custom: ${new Date().toISOString()}`
+  );
 
   const topThemeTotalCount = await prisma.$queryRawTyped(
     getUserTopThemeCount(userId, startDate, endDate)
   );
 
-  debugLog(`getUserTopThemeCount.custom: ${new Date().toISOString()}`);
+  console.log(`getUserTopThemeCount.custom: ${new Date().toISOString()}`);
 
   const totalSetsPerUser = globalStats.totalSets / globalStats.totalUsers;
   // top 5 viewed sets
@@ -557,7 +573,7 @@ const getUserRecaps = async ({
     getTopUserActivity(userId, startDate, endDate, 1)
   );
 
-  debugLog(`getTopUserActivity.custom: ${new Date().toISOString()}`);
+  console.log(`getTopUserActivity.custom: ${new Date().toISOString()}`);
 
   if (topActivity.length !== 0) {
     const data = await prisma.brickd_UserActivity.findFirst({
@@ -607,7 +623,7 @@ const getUserRecaps = async ({
       },
     });
 
-    debugLog(`brickd_UserActivity.findFirst: ${new Date().toISOString()}`);
+    console.log(`brickd_UserActivity.findFirst: ${new Date().toISOString()}`);
 
     if (data) {
       if (data.collectionItem) {
@@ -798,28 +814,32 @@ const getMonthlyStats = async ({
   };
 };
 
-const debugLog = (text: string) => {
-  debugLog(`🚧 [DEBUG]: ${text}`);
-};
-
-export const handler = async (event: any, context?: Context) => {
-  debugLog(`🚧 [DEBUG] 🟢 - Getting Started`);
-
-  debugLog(`Event: ${JSON.stringify(event, null, 2)}`);
-  debugLog(`Context: ${JSON.stringify(context, null, 2)}`);
-
+export const processRecap = async ({ userId }: { userId?: number }) => {
   dayjs.extend(utc);
 
   const startDate = dayjs.utc().startOf("month");
   const endDate = dayjs.utc().endOf("month");
 
-  const results = await prisma.$queryRawTyped(
-    getAudienceForMonthlyRecaps(
-      startDate.toDate(),
-      endDate.toDate(),
-      startDate.toDate()
-    )
-  );
+  if (userId) {
+    console.log(`== TEST RUN for ${userId}===`);
+  }
+
+  const results = userId
+    ? await prisma.$queryRawTyped(
+        getAudienceForMonthlyRecapTest(
+          startDate.toDate(),
+          endDate.toDate(),
+          startDate.toDate(),
+          userId
+        )
+      )
+    : await prisma.$queryRawTyped(
+        getAudienceForMonthlyRecaps(
+          startDate.toDate(),
+          endDate.toDate(),
+          startDate.toDate()
+        )
+      );
 
   const globalStats = await getMonthlyStats({
     startDate: startDate.toDate(),
@@ -836,21 +856,21 @@ export const handler = async (event: any, context?: Context) => {
       },
     });
 
-  debugLog(`Global Stats`);
-  debugLog(JSON.stringify(globalStats));
+  console.log(`Global Stats`);
+  console.log(JSON.stringify(globalStats));
 
-  debugLog(`Global Media Count:`);
-  debugLog(JSON.stringify(globalTotalMediaUploaded));
+  console.log(`Global Media Count:`);
+  console.log(JSON.stringify(globalTotalMediaUploaded));
 
   let recap: any | null = null;
 
   const dateKey = startDate.format("MM_YY");
 
-  debugLog(`REPORT DATE: ${dateKey}`);
+  console.log(`REPORT DATE: ${dateKey}`);
 
   for await (const user of results) {
     const now = performance.now();
-    debugLog(
+    console.log(
       `--- Starting with ${user.userName} - ${user.totalSets} sets ----`
     );
 
@@ -866,14 +886,14 @@ export const handler = async (event: any, context?: Context) => {
 
     const mediaKey = `${dateKey}/${user.uuid}.json`;
 
-    debugLog(`Done with Query: ${new Date().toISOString()}`);
+    console.log(`Done with Query: ${new Date().toISOString()}`);
 
     await uploadUserRecaps({
       data: JSON.stringify(data),
       key: mediaKey,
     });
 
-    debugLog(`S3 Upload Complete: ${new Date().toISOString()}`);
+    console.log(`S3 Upload Complete: ${new Date().toISOString()}`);
 
     const later = performance.now();
 
@@ -911,4 +931,13 @@ export const handler = async (event: any, context?: Context) => {
       });
     }
   }
+};
+
+export const handler = async (event: any, context?: Context) => {
+  console.log(`🚧 [DEBUG] 🟢 - Getting Started`);
+
+  console.log(`Event: ${JSON.stringify(event, null, 2)}`);
+  console.log(`Context: ${JSON.stringify(context, null, 2)}`);
+
+  await processRecap({});
 };
