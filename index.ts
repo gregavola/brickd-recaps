@@ -820,6 +820,10 @@ export const processRecap = async ({ userId }: { userId?: number }) => {
   const startDate = dayjs.utc().startOf("month");
   const endDate = dayjs.utc().endOf("month");
 
+  console.log(
+    `Starting for ${startDate.toISOString()} to ${endDate.toISOString()}`
+  );
+
   if (userId) {
     console.log(`== TEST RUN for ${userId}===`);
   }
@@ -939,5 +943,5 @@ export const handler = async (event: any, context?: Context) => {
   console.log(`Event: ${JSON.stringify(event, null, 2)}`);
   console.log(`Context: ${JSON.stringify(context, null, 2)}`);
 
-  await processRecap({});
+  await processRecap(event.userId ? { userId: event.userId } : {});
 };

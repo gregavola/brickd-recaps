@@ -26,8 +26,6 @@ WITH
             ) AS "totalMinifigs"
         FROM
             "brickd"."brickd_User"
-        WHERE
-            "brickd"."brickd_User".id = 1
     )
 SELECT
     a.*
