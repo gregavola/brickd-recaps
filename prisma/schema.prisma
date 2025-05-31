@@ -1,0 +1,5050 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["relationJoins", "typedSql"]
+}
+
+datasource db {
+  provider     = "postgresql"
+  url          = env("DATABASE_URL")
+  directUrl    = env("DIRECT_URL")
+  relationMode = "prisma"
+}
+
+model brickd_Apps {
+  id           Int                  @id @default(autoincrement())
+  uuid         String               @unique
+  clientId     String               @unique
+  clientSecret String               @unique
+  name         String
+  user         brickd_User          @relation(fields: [userId], references: [id])
+  userId       Int
+  createdAt    DateTime
+  AccessToken  brickd_AccessToken[]
+
+  @@index([userId])
+}
+
+model brickd_AuthPageLog {
+  id        Int          @id @default(autoincrement())
+  uuid      String       @unique @default(uuid())
+  url       String?
+  user      brickd_User? @relation(fields: [userId], references: [id])
+  userId    Int?
+  status    Int
+  notes     String?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime
+  updatedAt DateTime
+
+  @@index([userId])
+}
+
+model brickd_RebrickableData {
+  id        Int         @id @default(autoincrement())
+  uuid      String      @unique @default(uuid())
+  authToken String      @unique
+  user      brickd_User @relation(fields: [userId], references: [id])
+  userId    Int
+  createdAt DateTime
+  updatedAt DateTime
+
+  @@index([userId])
+}
+
+model brickd_RebrickableListSync {
+  id           Int                    @id @default(autoincrement())
+  uuid         String                 @unique @default(uuid())
+  syncList     brickd_RebrickableList @relation(fields: [listId], references: [id])
+  listId       Int
+  status       ImportQueueType        @default(QUEUED)
+  error        String?
+  response     String?                @db.Text
+  timeTaken    Decimal?               @db.Decimal(16, 2)
+  totalRecords Int?
+  createdAt    DateTime
+  updatedAt    DateTime
+
+  @@index([listId])
+}
+
+model brickd_RebrickableList {
+  id           Int                          @id @default(autoincrement())
+  uuid         String                       @unique @default(uuid())
+  listId       Int                          @unique
+  name         String
+  user         brickd_User                  @relation(fields: [userId], references: [id])
+  userId       Int
+  buildStatus  SetBuildStatus               @default(NOTBUILT)
+  collection   brickd_UserCollection?       @relation(fields: [collectionId], references: [id])
+  collectionId Int?
+  numOfSets    Int                          @default(0)
+  lastSynced   DateTime
+  createdAt    DateTime
+  updatedAt    DateTime
+  listSync     brickd_RebrickableListSync[]
+
+  @@index([userId])
+  @@index([collectionId])
+}
+
+model brickd_AccessToken {
+  id        Int         @id @default(autoincrement())
+  token     String      @unique @default(uuid())
+  user      brickd_User @relation(fields: [userId], references: [id])
+  userId    Int
+  createdAt DateTime
+  apps      brickd_Apps @relation(fields: [appId], references: [id])
+  appId     Int
+
+  @@index([userId])
+  @@index([token, userId])
+  @@index([appId])
+  @@index([userId, appId])
+}
+
+model brickd_AdminUser {
+  id        Int         @id @default(autoincrement())
+  uuid      String      @unique @default(uuid())
+  user      brickd_User @relation(fields: [userId], references: [id])
+  userId    Int
+  level     Int         @default(1)
+  createdAt DateTime
+
+  @@index([userId])
+}
+
+model brickd_User {
+  id                            Int                                         @id @default(autoincrement())
+  uuid                          String                                      @unique @default(uuid())
+  userName                      String                                      @unique
+  name                          String
+  avatar                        String
+  bio                           String?
+  instagramHandle               String?
+  youTubeUrl                    String?
+  link                          String?
+  email                         String                                      @unique
+  location                      String?
+  legoColor                     String?
+  isPrivate                     Int                                         @default(0)
+  isTestUser                    Int                                         @default(0)
+  createdAt                     DateTime
+  loopsId                       String?
+  isActive                      Int                                         @default(1)
+  hasCompletedOnboarding        Int                                         @default(1)
+  enableCommunicationEmails     Int                                         @default(1)
+  googlePlace                   brickd_UserGooglePlace?                     @relation(fields: [googlePlaceId], references: [googlePlaceId])
+  googlePlaceId                 String?
+  country                       brickd_Country?                             @relation(fields: [countryId], references: [id])
+  countryId                     Int?
+  enableChats                   Int                                         @default(1)
+  isCreator                     Int                                         @default(0)
+  isBuilder                     Int                                         @default(0)
+  signUpSource                  SignUpSource                                @default(APP)
+  timeZone                      String?
+  userCollections               brickd_UserCollection[]
+  userActivity                  brickd_UserActivity[]
+  accessTokens                  brickd_AccessToken[]
+  apps                          brickd_Apps[]
+  userSocials                   brickd_UserSocial[]
+  userLikes                     brickd_UserLike[]
+  userComments                  brickd_UserComment[]
+  ownerNotification             brickd_UserNotification[]                   @relation("OwnerUser")
+  userNotifications             brickd_UserNotification[]                   @relation("ActorUser")
+  followUser                    brickd_UserNotification[]                   @relation("FollowUser")
+  following                     brickd_UserFollows[]                        @relation("Following")
+  followers                     brickd_UserFollows[]                        @relation("Followers")
+  devices                       brickd_UserDevice[]
+  devicesRemoved                brickd_UserDevicesRemoved[]
+  rebrickableData               brickd_RebrickableData[]
+  rebrickableLists              brickd_RebrickableList[]
+  usersAppVersion               brickd_UserAppVersion[]
+  pushResponses                 brickd_PushResponses[]
+  setUserRatings                brickd_SetUserRating[]
+  reportedContent               brickd_ReportContent[]                      @relation("ReporterUser")
+  reportedUser                  brickd_ReportContent[]                      @relation("ActorUser")
+  blockedUsers                  brickd_BlockUser[]
+  mediaGroupParents             brickd_UserCollectionItemMediaGroupParent[]
+  indexRequests                 brickd_IndexRequest[]
+  userChallenges                brickd_UserBuildChallenge[]
+  userBuildChallengeLevels      brickd_UserBuildChallengeLevels[]
+  userAppNoticesSeen            brickd_AppNoticeSeen[]
+  setLikes                      brickd_SetLike[]
+  userMentions                  brickd_UserMention[]
+  loopsRequests                 brickd_LoopsRequest[]
+  appNoticeAudienceUser         brickd_AppNoticeAudienceUser[]
+  appNoticeViewed               brickd_AppNoticeViewed[]
+  setsViewed                    brickd_SetsViewed[]
+  generalAudienceUser           brickd_GeneralAudienceUser[]
+  userRequests                  brickd_Requests[]
+  openAiRequests                brickd_OpenAiRequests[]
+  signInRequests                brickd_SignInRequests[]
+  lastNotificationsRead         brickd_LastNotificationRead[]
+  userSetMarketplace            brickd_SetMarketplace[]
+  brickAdminUser                brickd_AdminUser[]
+  userActivtyGroupItems         brickd_UserActivityCollectionItemGroup[]
+  userCollaborativeCollections  brickd_UserCollectionMembers[]
+  userBuildNotes                brickd_UserCollectionItemNote[]
+  userCollectionItems           brickd_UserCollectionItem[]                 @relation("userCollectionItems")
+  userCollectionItemsBacklog    brickd_UserCollectionItem[]                 @relation("userCollectionBacklog")
+  invitedMembers                brickd_UserCollectionInvitedMembers[]
+  supportTickets                brickd_SupportTicket[]
+  mocSet                        brickd_Set[]
+  qrScans                       brickd_QRScan[]
+  userChats                     brickd_UserChat[]
+  chatMessages                  brickd_ChatMessage[]
+  userStatus                    brickd_UserStatus[]
+  chatsLastRead                 brickd_ChatLastRead[]
+  setReviewCreators             brickd_SetReviewCreator[]
+  setReviewClikc                brickd_SetReviewClick[]
+  setMarketplaceClick           brickd_SetMarketplaceClick[]
+  mediaWatched                  brickd_MediaWatched[]
+  mediaViewed                   brickd_MediaViewed[]
+  setReviewsViewed              brickd_SetReviewViewed[]
+  userCollectionDefault         brickd_UserCollectionDefault[]
+  rebrickableAuthLog            brickd_RebrickableAuthLog[]
+  creatorRequests               brickd_CreatorRequest[]
+  userCommentsLikes             brickd_UserCommentLikes[]
+  importRequests                brickd_ImportRequest[]
+  activityCommentUnsubscribers  brickd_ActivityCommentUnsubscriber[]
+  setMarketplaceAlerts          brickd_SetMarketplaceAlert[]
+  setAlertLogs                  brickd_SetMarketplaceAlertLog[]
+  builderTransactions           brickd_BuilderTransaction[]
+  revenueCatErrors              brickd_RevenueCatError[]
+  cloudinaryErrors              brickd_CloudinaryError[]
+  buildEventMembers             brickd_BuildEventMember[]
+  buildEventDiscussions         brickd_BuildEventDiscussion[]
+  buildEvents                   brickd_BuildEvent[]
+  setChanges                    brickd_SetChanges[]
+  userViews                     brickd_Views[]                              @relation("userViews")
+  profileViews                  brickd_Views[]                              @relation("profileViews")
+  discussions                   brickd_Discussion[]
+  discussionMessages            brickd_DiscussionMessage[]
+  discussionLikes               brickd_DiscussionLike[]
+  discussionMessageLikes        brickd_DiscussionMessageLike[]
+  discussionViews               brickd_DiscussionView[]
+  discussionUnsubscriber        brickd_DiscussionUnsubscriber[]
+  discussionMedia               brickd_DiscussionMedia[]
+  discussionUrlClick            brickd_DiscussionUrlClick[]
+  discussionPollVote            brickd_DiscussionPollVote[]
+  discussionRuleAcceptance      brickd_DiscussionRuleAcceptance[]
+  discussionStatusLog           brickd_DiscussionStatusLog[]
+  brickd_RestrictionLog         brickd_RestrictionLog[]
+  userCollectionMinifigsItems   brickd_UserCollectionMinifigItem[]
+  flaggedUsers                  brickd_FlaggedUsers[]
+  minifigProposedEdits          brickd_MinifigProposeEdit[]
+  lightingUrlClicks             brickd_LightingUrlClick[]
+  userExports                   brickd_ExportRequest[]
+  userCollectionAutoImport      brickd_UserCollectionMinfigAutoImport[]
+  liveStream                    brickd_LiveStream[]
+  userSubscribes                brickd_UserSubscribe[]
+  collectionLikes               brickd_CollectionLike[]
+  yearInBricksEvents            brickd_YearInBrickEvents[]
+  discussionRepost              brickd_DiscussionRepost[]
+  promotedUser                  brickd_PromotedUser[]
+  promotedUserViews             brickd_PromotedUserView[]
+  builderCancellation           brickd_BuilderCancellation[]
+  yearInBrickUser               brickd_YearInBrickUser[]
+  builderSignUpDate             brickd_BuilderSignUpDate?
+  profileUser                   brickd_GeneralAudienceUser[]                @relation(name: "profileUser")
+  setComment                    brickd_SetComment[]
+  setUpdates                    brickd_SetUpdates[]
+  setUpdateLikes                brickd_SetUpdatesLike[]
+  buildStreaks                  brickd_BuildStreak[]
+  openAIImport                  brickd_OpenAIImport[]
+  userRecaps                    brickd_UserRecap[]
+  userRecapEvents               brickd_UserRecapEvents[]
+  userLocation                  brickd_UserLocation[]
+  promotionsCreated             brickd_Promotions[]
+  promotionsEarned              brickd_PromotionsEarned[]
+  promotionsViewed              brickd_PromotionViewed[]
+  promotionClicks               brickd_PromotionUrlClick[]
+  ignoredUsers                  brickd_IgnoreSuggestedUser[]
+  ignoredSets                   brickd_IgnoredRecommendedSet[]
+  userRecommendationPreferences brickd_UserRecommendationPreferences[]
+  promotionsAttemps             brickd_PromotionsAttempts[]
+  releaseNOteViews              brickd_ReleaseNotesViewed[]
+  chatMessageReactions          brickd_ChatMessageReaction[]
+  chatMessageUrlClicks          brickd_ChatMessageUrlClicks[]
+  chatMessageMedia              brickd_ChatMessageMedia[]
+  chatRuleAcceptance            brickd_ChatRuleAcceptance[]
+  authPageLogs                  brickd_AuthPageLog[]
+  buildEventDiscussionLikes     brickd_BuildEventDiscussionLike[]
+  buildEventMedias              brickd_BuildEventMedia[]
+  buildEventLikes               brickd_BuildEventLike[]
+  buildEventInvites             brickd_BuildEventInvited[]
+  buildEventLastRead            brickd_BuildEventDiscussionLastRead[]
+  userAppActivity               brickd_UserAppActivity[]
+  userShirtStreak               brickd_ShirtStreak[]
+  userStreakReminders           brickd_StreakReminderEmail[]
+  userSpotify                   brickd_UserSpotify[]
+  userSpotifyPlaylist           brickd_UserSpotifyPlaylist[]
+  userValidationToken           brickd_UserValidationToken[]
+  userLinkClick                 brickd_LinkClick[]
+  buildEventPosts               brickd_BuildEventPost[]
+  buildEventPostsHidden         brickd_BuildEventPostHidden[]
+  buildEventMemberCheckin       brickd_BuildEventMemberCheckin[]
+  buildEventGiveaways           brickd_BuildEventGiveaway[]
+  buildEventGiveawayLogs        brickd_BuildEventGiveawayWinnerLog[]
+  brickd_BuildEventAdmin        brickd_BuildEventAdmin[]
+  brickd_PromotionsWinner       brickd_PromotionsWinner[]
+
+  @@index([countryId])
+  @@index([createdAt])
+  @@index([isPrivate])
+  @@index([uuid, userName])
+  @@index([googlePlaceId])
+  @@index([isActive, isPrivate, id])
+}
+
+model brickd_UserGooglePlace {
+  id            Int           @id @default(autoincrement())
+  uuid          String        @unique @default(uuid())
+  googlePlaceId String        @unique
+  name          String
+  subtitle      String?
+  latitude      Float?        @db.DoublePrecision
+  longitude     Float?        @db.DoublePrecision
+  updatedAt     DateTime
+  createdAt     DateTime
+  usersLocated  brickd_User[]
+}
+
+model brickd_OpenAIImport {
+  id             Int          @id @default(autoincrement())
+  uuid           String       @unique @default(uuid())
+  user           brickd_User? @relation(fields: [userId], references: [id])
+  userId         Int?
+  imageUrl       String
+  response       String?
+  labelsDetected Int?
+  timeTaken      Decimal?     @db.Decimal(16, 2)
+  status         AIStatusType
+  createdAt      DateTime
+
+  @@index([userId])
+}
+
+model brickd_UserSocial {
+  id         Int            @id @default(autoincrement())
+  uuid       String         @unique @default(uuid())
+  socialId   String
+  socialType UserSocialType @default(GOOGLE)
+  user       brickd_User    @relation(fields: [userId], references: [id])
+  userId     Int
+  createdAt  DateTime
+
+  @@index([userId])
+}
+
+model brickd_ParentTheme {
+  id                                   Int                                    @id @default(autoincrement())
+  uuid                                 String                                 @unique @default(uuid())
+  name                                 String
+  createdAt                            DateTime
+  parentItems                          brickd_ParentThemeItems[]
+  brickd_UserRecommendationPreferences brickd_UserRecommendationPreferences[]
+}
+
+model brickd_ParentThemeItems {
+  id          Int                @id @default(autoincrement())
+  uuid        String             @unique @default(uuid())
+  theme       brickd_Theme       @relation(fields: [themeId], references: [rebrickableId])
+  themeId     Int
+  parentTheme brickd_ParentTheme @relation(fields: [parentId], references: [id])
+  parentId    Int
+  createdAt   DateTime
+
+  @@index([parentId])
+  @@index([themeId])
+  @@index([themeId, parentId])
+}
+
+model brickd_SetSubTheme {
+  id        Int          @id @default(autoincrement())
+  uuid      String       @unique @default(uuid()) @db.VarChar(50)
+  setId     Int
+  set       brickd_Set   @relation(fields: [setId], references: [id])
+  theme     brickd_Theme @relation(fields: [themeId], references: [rebrickableId])
+  themeId   Int
+  createdAt DateTime
+
+  @@index([themeId])
+  @@index([setId])
+  @@index([setId, themeId])
+}
+
+model brickd_Theme {
+  id                 Int                       @id @default(autoincrement())
+  rebrickableId      Int                       @unique
+  uuid               String                    @unique @default(uuid())
+  name               String
+  updatedAt          DateTime
+  createdAt          DateTime
+  isSubTheme         Int                       @default(0)
+  set                brickd_Set[]
+  themeTemp          brickd_ThemeTemp?
+  parentItems        brickd_ParentThemeItems[]
+  brickd_SetSubTheme brickd_SetSubTheme[]
+}
+
+model brickd_MediaViewed {
+  id        Int                             @id @default(autoincrement())
+  uuid      String                          @unique @default(uuid())
+  userId    Int?
+  user      brickd_User?                    @relation(fields: [userId], references: [id])
+  media     brickd_UserCollectionItemMedia? @relation(fields: [mediaId], references: [id])
+  ipAddress String?
+  userAgent String?
+  isBot     Int                             @default(0)
+  source    MediaViewedSource?
+  mediaId   Int?
+  createdAt DateTime
+
+  @@index([userId])
+  @@index([mediaId])
+}
+
+model brickd_MediaWatched {
+  id            Int                             @id @default(autoincrement())
+  uuid          String                          @unique @default(uuid())
+  userId        Int?
+  user          brickd_User?                    @relation(fields: [userId], references: [id])
+  media         brickd_UserCollectionItemMedia? @relation(fields: [mediaId], references: [id])
+  mediaId       Int?
+  mediaDuration Int
+  createdAt     DateTime
+
+  @@index([userId])
+  @@index([mediaId])
+}
+
+model brickd_SecurityLogs {
+  id                 Int      @id @default(autoincrement())
+  uuid               String   @unique @default(uuid()) @db.VarChar(50)
+  ipAddress          String   @unique @db.VarChar(255)
+  numberOfUserAgents Int
+  numberOfRequests   Int
+  lastRequestUrl     String?
+  lastRequestDate    DateTime
+  createdAt          DateTime
+  updatedAt          DateTime
+}
+
+model brickd_SetsViewed {
+  id               Int                        @id @default(autoincrement())
+  uuid             String                     @unique @default(uuid()) @db.VarChar(50)
+  userId           Int?
+  user             brickd_User?               @relation(fields: [userId], references: [id])
+  setId            Int
+  ipAddress        String?                    @db.VarChar(255)
+  userAgent        String?                    @db.VarChar(500)
+  isBot            Int                        @default(0) @db.SmallInt
+  set              brickd_Set                 @relation(name: "setsViewed", fields: [setId], references: [id], map: "fk_setsViewed")
+  setTimeSeries    brickd_Set                 @relation(name: "setsViewedTimeSeries", fields: [setId], references: [id], map: "fk_setsViewedTimeSeries")
+  collectionItem   brickd_UserCollectionItem? @relation(fields: [collectionItemId], references: [id])
+  collectionItemId Int?
+  createdAt        DateTime
+
+  @@index([userId, createdAt])
+  @@index([userId])
+  @@index([setId])
+  @@index([setId, createdAt])
+  @@index([setId, ipAddress, createdAt, collectionItemId])
+  @@index([setId, ipAddress, isBot])
+  @@index([setId, createdAt, isBot])
+  @@index([userId, setId, createdAt])
+  @@index([collectionItemId])
+  @@index([userId, collectionItemId])
+  @@index([createdAt])
+  @@index([createdAt, setId])
+}
+
+model brickd_Views {
+  id                    Int                               @id @default(autoincrement())
+  uuid                  String                            @unique @default(uuid()) @db.VarChar(50)
+  userId                Int?
+  user                  brickd_User?                      @relation(name: "userViews", fields: [userId], references: [id])
+  viewType              ViewType                          @default(ACTIVITY)
+  profileViewSource     ProfileViewSource?
+  ipAddress             String?                           @db.VarChar(1500)
+  userAgent             String?                           @db.VarChar(1500)
+  activityId            Int?
+  activity              brickd_UserActivity?              @relation(fields: [activityId], references: [id])
+  collectionMinifigItem brickd_UserCollectionMinifigItem? @relation(fields: [collectionMinifigId], references: [id])
+  collectionMinifigId   Int?
+  collectionItem        brickd_UserCollectionItem?        @relation(fields: [collectionItemId], references: [id])
+  collectionItemId      Int?
+  collection            brickd_UserCollection?            @relation(fields: [collectionId], references: [id])
+  collectionId          Int?
+  profileUser           brickd_User?                      @relation(name: "profileViews", fields: [profileUserId], references: [id], map: "profileViews_fk")
+  profileUserId         Int?
+  minifig               brickd_Minifig?                   @relation(fields: [profileUserId], references: [id])
+  minifigId             Int?
+  setReleaseList        brickd_SetReleaseList?            @relation(fields: [releaseId], references: [id])
+  releaseId             Int?
+  buildEvent            brickd_BuildEvent?                @relation(fields: [eventId], references: [id])
+  eventId               Int?
+  eventViewSource       EventViewSource?
+  isBot                 Int                               @default(0) @db.SmallInt
+  createdAt             DateTime
+
+  @@index([userId])
+  @@index([collectionItemId])
+  @@index([activityId])
+  @@index([activityId, isBot, createdAt])
+  @@index([collectionId])
+  @@index([collectionId, isBot, createdAt])
+  @@index([profileUserId])
+  @@index([profileUserId, createdAt])
+  @@index([collectionMinifigId])
+  @@index([releaseId])
+  @@index([eventId])
+}
+
+model brickd_SetLightingVendor {
+  id             Int                  @id @default(autoincrement())
+  uuid           String               @unique @default(uuid())
+  name           String
+  url            String
+  imageUrl       String
+  currencySymbol String
+  currencyCode   String
+  createdAt      DateTime
+  updatedAt      DateTime
+  setLightings   brickd_SetLighting[]
+}
+
+model brickd_LightingUrlClick {
+  id          Int                 @id @default(autoincrement())
+  uuid        String              @unique @default(uuid())
+  type        UrlClickType        @default(LIGHTNINGKIT)
+  kit         brickd_SetLighting? @relation(fields: [kitId], references: [id])
+  kitId       Int?
+  userId      Int?
+  user        brickd_User?        @relation(fields: [userId], references: [id])
+  ipAddress   String
+  userAgent   String?
+  isBot       Int                 @default(0)
+  referer     String?
+  countryCode String?
+  latitude    Float?
+  longitude   Float?
+  regionName  String?
+  cityName    String?
+  zipCode     String?
+  createdAt   DateTime
+
+  @@index([kitId])
+  @@index([userId])
+}
+
+model brickd_SetLighting {
+  id          Int                       @id @default(autoincrement())
+  uuid        String                    @unique @default(uuid()) @db.VarChar(50)
+  setId       Int
+  set         brickd_Set                @relation(fields: [setId], references: [id])
+  vendorId    Int
+  vendor      brickd_SetLightingVendor  @relation(fields: [vendorId], references: [id])
+  url         String
+  price       Float?
+  isSponsored Int                       @default(0) @db.SmallInt
+  title       String?
+  createdAt   DateTime                  @default(now())
+  updatedAt   DateTime                  @default(now())
+  urlClicks   brickd_LightingUrlClick[]
+
+  @@index([setId])
+  @@index([vendorId])
+}
+
+model brickd_SetDataHistory {
+  id          Int        @id @default(autoincrement())
+  uuid        String     @unique @default(uuid()) @db.VarChar(50)
+  setId       Int
+  set         brickd_Set @relation(fields: [setId], references: [id])
+  response    String     @db.Text
+  hasMinifigs Int        @default(0) @db.SmallInt
+  createdAt   DateTime
+
+  @@index([setId])
+}
+
+model brickd_SetRefresh {
+  id        Int        @id @default(autoincrement())
+  uuid      String     @unique @default(uuid()) @db.VarChar(50)
+  setId     Int
+  set       brickd_Set @relation(fields: [setId], references: [id])
+  isError   Int        @default(0) @db.SmallInt
+  response  String     @db.VarChar(1000)
+  createdAt DateTime
+
+  @@index([setId])
+}
+
+model brickd_BlockUser {
+  id        Int         @id @default(autoincrement())
+  uuid      String      @unique @default(uuid())
+  actorId   Int
+  userId    Int
+  user      brickd_User @relation(fields: [userId], references: [id])
+  createdAt DateTime
+
+  @@index([userId])
+  @@index([actorId])
+}
+
+model brickd_BuildEventPostHidden {
+  id         Int                 @id @default(autoincrement())
+  uuid       String              @unique @default(uuid())
+  activity   brickd_UserActivity @relation(fields: [activityId], references: [id])
+  activityId Int
+  buildEvent brickd_BuildEvent   @relation(fields: [eventId], references: [id])
+  eventId    Int
+  user       brickd_User         @relation(fields: [userId], references: [id])
+  userId     Int
+  reason     String
+  createdAt  DateTime
+
+  @@index([userId])
+  @@index([activityId])
+  @@index([eventId])
+}
+
+model brickd_ReportContent {
+  id                  Int                          @id @default(autoincrement())
+  uuid                String                       @unique @default(uuid())
+  profileUserId       Int?
+  profile             brickd_User?                 @relation(name: "ActorUser", fields: [profileUserId], references: [id])
+  activityId          Int?
+  activity            brickd_UserActivity?         @relation(fields: [activityId], references: [id])
+  userId              Int
+  message             String?                      @db.Text
+  comment             brickd_UserComment?          @relation(fields: [commentUuid], references: [uuid])
+  commentUuid         String?
+  collection          brickd_UserCollection?       @relation(fields: [collectionUuid], references: [uuid])
+  collectionUuid      String?
+  collectionItem      brickd_UserCollectionItem?   @relation(fields: [collectionItemUuid], references: [uuid])
+  collectionItemUuid  String?
+  set                 brickd_Set?                  @relation(fields: [setUuid], references: [uuid])
+  setUuid             String?
+  review              brickd_SetReview?            @relation(fields: [reviewUuid], references: [uuid])
+  reviewUuid          String?
+  chat                brickd_Chat?                 @relation(fields: [chatId], references: [id])
+  chatId              Int?
+  chatMessage         brickd_ChatMessage?          @relation(fields: [chatMessageId], references: [id])
+  chatMessageId       Int?
+  discussion          brickd_Discussion?           @relation(fields: [discussionId], references: [id])
+  discussionId        Int?
+  discussionMessage   brickd_DiscussionMessage?    @relation(fields: [discussionMessageId], references: [id])
+  discussionMessageId Int?
+  buildEventMessage   brickd_BuildEventDiscussion? @relation(fields: [buildEventMessageId], references: [id])
+  buildEventMessageId Int?
+  buildEvent          brickd_BuildEvent?           @relation(fields: [eventId], references: [id])
+  eventId             Int?
+  user                brickd_User                  @relation(name: "ReporterUser", fields: [userId], references: [id])
+  reportType          ReportContentType            @default(COMMENT)
+  reportStatus        ReportContentDecision        @default(PENDING)
+  adminMessage        String?
+  updatedAt           DateTime?
+  createdAt           DateTime
+
+  @@index([activityId])
+  @@index([userId])
+  @@index([commentUuid])
+  @@index([collectionItemUuid])
+  @@index([setUuid])
+  @@index([collectionUuid])
+  @@index([chatId])
+  @@index([reviewUuid])
+  @@index([discussionId])
+  @@index([discussionMessageId])
+  @@index([profileUserId])
+  @@index([chatMessageId])
+  @@index([eventId])
+  @@index([buildEventMessageId])
+}
+
+model brickd_SetUserRating {
+  id        Int         @id @default(autoincrement())
+  uuid      String      @unique @default(uuid())
+  set       brickd_Set  @relation(fields: [setId], references: [id])
+  setId     Int
+  user      brickd_User @relation(fields: [userId], references: [id])
+  userId    Int
+  rating    Float
+  createdAt DateTime
+  updatedAt DateTime
+
+  @@unique([userId, setId])
+  @@index([setId])
+  @@index([userId])
+}
+
+model brickd_SetLike {
+  id          Int         @id @default(autoincrement())
+  uuid        String      @unique @default(uuid())
+  set         brickd_Set  @relation(name: "setLikes", fields: [setId], references: [id], map: "userLike_fk")
+  authSetLike brickd_Set  @relation(name: "authSetLikes", fields: [userId], references: [id], map: "authUserLike_fk")
+  setId       Int
+  user        brickd_User @relation(fields: [userId], references: [id])
+  userId      Int
+  createdAt   DateTime
+
+  @@index([setId])
+  @@index([userId])
+}
+
+model brickd_CollectionLike {
+  id                 Int                   @id @default(autoincrement())
+  uuid               String                @unique @default(uuid())
+  collection         brickd_UserCollection @relation(name: "collectionLikes", fields: [collectionId], references: [id], map: "collectionLikes_fk")
+  authCollectionLike brickd_UserCollection @relation(name: "authCollectionLikes", fields: [collectionId], references: [id], map: "authCollectionLikes_fk")
+  collectionId       Int
+  user               brickd_User           @relation(fields: [userId], references: [id])
+  userId             Int
+  createdAt          DateTime
+
+  @@index([collectionId])
+  @@index([userId])
+}
+
+model brickd_SetImage {
+  id          Int             @id @default(autoincrement())
+  uuid        String          @unique @default(uuid())
+  imageUrl    String
+  mediaKey    String?
+  mediaAltKey String?
+  mediaSource MediaSourceType @default(CLOUDINARY)
+  set         brickd_Set      @relation(fields: [setId], references: [id])
+  setId       Int
+  createdAt   DateTime
+
+  @@index([setId])
+}
+
+model brickd_SetMarketplaceAlert {
+  id        Int         @id @default(autoincrement())
+  uuid      String      @unique @default(uuid())
+  set       brickd_Set  @relation(fields: [setId], references: [id])
+  setId     Int
+  user      brickd_User @relation(fields: [userId], references: [id])
+  userId    Int
+  createdAt DateTime
+
+  @@index([userId])
+  @@index([setId])
+}
+
+model brickd_SetMarketplacePriceChange {
+  id                      Int                             @id @default(autoincrement())
+  uuid                    String                          @unique @default(uuid())
+  item                    brickd_SetMarketplace           @relation(fields: [itemId], references: [id])
+  itemId                  Int
+  oldPrice                Float
+  newPrice                Float
+  vendor                  brickd_SetMarketplaceVendor     @relation(fields: [vendorId], references: [id])
+  vendorId                Int                             @default(1)
+  difference              Float
+  createdAt               DateTime
+  setMarketplaceAlertLogs brickd_SetMarketplaceAlertLog[]
+
+  @@index([itemId])
+  @@index([vendorId])
+}
+
+model brickd_SetMarketplacePriceChangeLog {
+  id                    Int                           @id @default(autoincrement())
+  uuid                  String                        @unique @default(uuid())
+  setMarketPlaceRefresh brickd_SetMarketplaceRefresh? @relation(fields: [refreshId], references: [id])
+  refreshId             Int?
+  setId                 Int
+  oldPrice              Float?
+  newPrice              Float
+  subscribers           Int                           @default(0)
+  legoPrice             Int                           @default(0) @db.SmallInt
+  vendor                brickd_SetMarketplaceVendor   @relation(fields: [vendorId], references: [id])
+  vendorId              Int                           @default(1)
+  difference            Float
+  createdAt             DateTime
+
+  @@index([setId, vendorId, createdAt(sort: Desc)])
+  @@index([createdAt])
+  @@index([refreshId])
+  @@index([vendorId])
+}
+
+model brickd_SetMarketplacePriceHistory {
+  id                  Int                         @id @default(autoincrement())
+  uuid                String                      @unique @default(uuid())
+  set                 brickd_Set                  @relation(fields: [setId], references: [id])
+  setId               Int
+  totalSubcribedUsers Int
+  ogPrice             Float
+  currentPrice        Float
+  vendor              brickd_SetMarketplaceVendor @relation(fields: [vendorId], references: [id])
+  vendorId            Int                         @default(1) @db.SmallInt
+  percentageChange    Float
+  didAlert            Int                         @default(0)
+  createdAt           DateTime
+
+  @@index([vendorId])
+  @@index([setId])
+}
+
+model brickd_SetMarketplaceAlertLog {
+  id           Int                               @id @default(autoincrement())
+  uuid         String                            @unique @default(uuid())
+  item         brickd_SetMarketplaceRefresh      @relation(fields: [itemId], references: [id])
+  itemId       Int
+  user         brickd_User?                      @relation(fields: [userId], references: [id])
+  userId       Int?
+  priceChange  brickd_SetMarketplacePriceChange? @relation(fields: [priceId], references: [id])
+  priceId      Int?
+  pushResponse brickd_PushResponses?             @relation(fields: [pushId], references: [id])
+  pushId       Int?
+  createdAt    DateTime
+
+  @@index([userId])
+  @@index([pushId])
+  @@index([itemId])
+  @@index([priceId])
+}
+
+model brickd_ModificationSet {
+  id        Int        @id @default(autoincrement())
+  uuid      String     @unique @default(uuid())
+  mocSetId  Int
+  mocSet    brickd_Set @relation("MocSet", fields: [mocSetId], references: [id])
+  set       brickd_Set @relation("ActualSet", fields: [setId], references: [id])
+  setId     Int
+  createdAt DateTime
+
+  @@index([setId])
+  @@index([mocSetId])
+}
+
+model brickd_SetChanges {
+  id              Int          @id @default(autoincrement())
+  uuid            String       @unique @default(uuid())
+  existingPayload String
+  newPayload      String
+  user            brickd_User? @relation(fields: [userId], references: [id])
+  userId          Int?
+  set             brickd_Set   @relation(fields: [setId], references: [id])
+  setId           Int
+  createdAt       DateTime
+
+  @@index([userId])
+  @@index([setId])
+}
+
+model brickd_SetAgeGroup {
+  id         Int          @id @default(autoincrement())
+  uuid       String       @unique @default(uuid())
+  name       String
+  value      Int          @default(0)
+  createdAt  DateTime
+  position   Int          @default(0)
+  brickd_Set brickd_Set[]
+}
+
+model brickd_CMFScan {
+  id          Int                  @id @default(autoincrement())
+  uuid        String               @unique @default(uuid()) @db.VarChar(50)
+  set         brickd_Set           @relation(fields: [setId], references: [id])
+  setId       Int
+  value       String?              @db.VarChar(1000)
+  country     String?              @db.VarChar(1000)
+  createdAt   DateTime
+  cmfScanItem brickd_CMFScanItem[]
+
+  @@index([setId])
+  @@index([value])
+}
+
+model brickd_CMFScanItem {
+  id        Int            @id @default(autoincrement())
+  uuid      String         @unique @default(uuid()) @db.VarChar(50)
+  cmfScan   brickd_CMFScan @relation(fields: [cmfScanId], references: [id])
+  cmfScanId Int
+  value     String         @db.VarChar(1000)
+  country   String         @db.VarChar(1000)
+  createdAt DateTime
+
+  @@index([cmfScanId])
+  @@index([value])
+}
+
+model brickd_SetInstructions {
+  id           Int        @id @default(autoincrement())
+  uuid         String     @unique @default(uuid()) @db.VarChar(50)
+  name         String     @db.VarChar(100)
+  set          brickd_Set @relation(fields: [setId], references: [id])
+  setId        Int
+  url          String     @db.VarChar(1000)
+  thumbnailKey String?
+  isLEGO       Int        @default(0)
+  updatedAt    DateTime
+  createdAt    DateTime
+
+  @@index([setId])
+}
+
+model brickd_SetUpdates {
+  id                Int                       @id @default(autoincrement())
+  uuid              String                    @unique @default(uuid()) @db.VarChar(50)
+  user              brickd_User               @relation(fields: [userId], references: [id])
+  userId            Int
+  set               brickd_Set                @relation(fields: [setId], references: [id])
+  setId             Int
+  comment           String
+  createdAt         DateTime
+  likes             brickd_SetUpdatesLike[]   @relation("likes")
+  authLikes         brickd_SetUpdatesLike[]   @relation("authLikes")
+  userNotifications brickd_UserNotification[]
+  setUpdateMedias   brickd_SetUpdateMedia[]
+
+  @@index([userId])
+  @@index([setId])
+}
+
+model brickd_SetUpdateMedia {
+  id                Int                     @id @default(autoincrement())
+  uuid              String                  @unique @default(uuid())
+  update            brickd_SetUpdates       @relation(fields: [updateId], references: [id])
+  updateId          Int
+  position          Int
+  mediaType         CollectionItemMediaType
+  mediaSource       MediaSourceType         @default(CLOUDINARY)
+  mediaThumbnailKey String?
+  mediaRawUrl       String?
+  mediaKey          String?
+  mediaAltKey       String?
+  mediaUrl          String
+  createdAt         DateTime
+
+  @@index([updateId])
+}
+
+model brickd_SetUpdatesLike {
+  id         Int               @id @default(autoincrement())
+  uuid       String            @unique @default(uuid()) @db.VarChar(50)
+  user       brickd_User       @relation(fields: [userId], references: [id])
+  userId     Int
+  update     brickd_SetUpdates @relation(name: "likes", fields: [updateId], references: [id], map: "updatesLikes_fk")
+  authUpdate brickd_SetUpdates @relation(name: "authLikes", fields: [updateId], references: [id], map: "updatesAuthLikes_fk")
+  updateId   Int
+  createdAt  DateTime
+
+  @@index([userId])
+  @@index([updateId])
+}
+
+model brickd_SetComment {
+  id             Int                        @id @default(autoincrement())
+  uuid           String                     @unique @default(uuid()) @db.VarChar(50)
+  user           brickd_User                @relation(fields: [userId], references: [id])
+  userId         Int
+  set            brickd_Set                 @relation(fields: [setId], references: [id])
+  setId          Int
+  isReply        Int                        @default(0)
+  comment        String                     @db.VarChar(1000)
+  commentReplies brickd_SetCommentReplies[] @relation("comments")
+  rawReplies     brickd_SetCommentReplies[] @relation("reply")
+  createdAt      DateTime
+
+  @@index([userId])
+  @@index([setId])
+}
+
+model brickd_SetCommentReplies {
+  id        Int               @id @default(autoincrement())
+  uuid      String            @unique @default(uuid())
+  commentId Int
+  comment   brickd_SetComment @relation("comments", fields: [commentId], references: [id])
+  replyId   Int
+  reply     brickd_SetComment @relation("reply", fields: [replyId], references: [id])
+  createdAt DateTime
+
+  @@index([commentId])
+  @@index([replyId])
+}
+
+model brickd_SetVendor {
+  id                Int                           @id @default(autoincrement())
+  uuid              String                        @unique @default(uuid()) @db.VarChar(50)
+  name              String
+  url               String
+  vendorPrefix      String
+  isLEGO            Int                           @default(0)
+  imageUrl          String
+  createdAt         DateTime
+  sets              brickd_Set[]
+  marketplaceVendor brickd_SetMarketplaceVendor[]
+}
+
+model brickd_Set {
+  id                         Int                                 @id @default(autoincrement())
+  uuid                       String                              @unique @default(uuid()) @db.VarChar(50)
+  setNumber                  String                              @unique @db.VarChar(255)
+  name                       String
+  slug                       String
+  year                       String                              @db.VarChar(10)
+  yearNumeric                Int?
+  theme                      brickd_Theme                        @relation(fields: [themeId], references: [rebrickableId])
+  themeId                    Int
+  numberOfParts              Int                                 @default(0)
+  setImageUrl                String                              @db.VarChar(255)
+  customSetImageUrl          String?                             @db.VarChar(255)
+  updatedAt                  DateTime
+  createdAt                  DateTime
+  isLocked                   Int                                 @default(0) @db.SmallInt
+  isMOC                      Int                                 @default(0) @db.SmallInt
+  isActive                   Int                                 @default(1) @db.SmallInt
+  isRetired                  Int                                 @default(0) @db.SmallInt
+  description                String?                             @db.VarChar(2000)
+  setVendor                  brickd_SetVendor?                   @relation(fields: [vendorId], references: [id])
+  vendorId                   Int?
+  user                       brickd_User?                        @relation(fields: [userId], references: [id])
+  userId                     Int?
+  ageGroup                   brickd_SetAgeGroup?                 @relation(fields: [ageGroupId], references: [id])
+  ageGroupId                 Int?
+  rebrickableUrl             String?
+  customUrl                  String?
+  releaseDate                DateTime?
+  isGWP                      Int                                 @default(0) @db.SmallInt
+  inLegoCatalog              Int                                 @default(1) @db.SmallInt
+  upc                        String?
+  totalBagCount              Int?                                @db.SmallInt
+  hasNumberedBags            Int?                                @db.SmallInt
+  hasStickers                Int?                                @db.SmallInt
+  collectionItems            brickd_UserCollectionItem[]         @relation("collectionSet")
+  activitySet                brickd_UserCollectionItem[]         @relation("activitySet")
+  setMinifigs                brickd_SetMinifigs[]
+  setDataHistory             brickd_SetDataHistory[]
+  setUserRating              brickd_SetUserRating[]
+  setOfDay                   brickd_SetOfDay[]
+  setLikes                   brickd_SetLike[]                    @relation("setLikes")
+  authSetLike                brickd_SetLike[]                    @relation("authSetLikes")
+  setsViewed                 brickd_SetsViewed[]                 @relation("setsViewed")
+  setsViewedTimeSeries       brickd_SetsViewed[]                 @relation("setsViewedTimeSeries")
+  setsRefreshed              brickd_SetRefresh[]
+  setsMarketplace            brickd_SetMarketplace[]
+  setMarketplaceRefresh      brickd_SetMarketplaceRefresh[]
+  brickd_SetsTemp            brickd_SetsTemp?
+  reportedContent            brickd_ReportContent[]
+  setChatMessages            brickd_ChatMessage[]
+  setImages                  brickd_SetImage[]
+  setReviews                 brickd_SetReview[]
+  setMarketplaceIgnored      brickd_SetMarketplaceIgnored[]
+  crawlStats                 brickd_CrawlStats[]
+  setMarketplaceAlerts       brickd_SetMarketplaceAlert[]
+  setMarketplaceIgnoredItem  brickd_SetMarketplaceIgnoredItem[]
+  actualSet                  brickd_ModificationSet[]            @relation("ActualSet")
+  mocSet                     brickd_ModificationSet[]            @relation("MocSet")
+  setChanges                 brickd_SetChanges[]
+  discussions                brickd_Discussion[]
+  discussionSets             brickd_DiscussionSet[]
+  challengeSetLists          brickd_BuildChallengeSetList[]
+  lightingSets               brickd_SetLighting[]
+  setInstructions            brickd_SetInstructions[]
+  priceAlertHistory          brickd_SetMarketplacePriceHistory[]
+  mocSetUpdates              brickd_SetUpdates[]
+  mocSetComments             brickd_SetComment[]
+  cmfScanSets                brickd_CMFScan[]
+  qrScans                    brickd_QRScan[]
+  legoScrapeFailures         brickd_LegoScapeFailure[]
+  ignoredSets                brickd_IgnoredRecommendedSet[]
+  subThemes                  brickd_SetSubTheme[]
+  openAIRequests             brickd_OpenAiRequests[]
+  setHighlight               brickd_SetHighlight?
+  ignoreEbay                 brickd_IgnoreEbay?
+  setImageEmedding           brickd_SetImageEmbedding[]
+  buildEventSets             brickd_BuildEventSet[]
+  brickd_UserSpotifyPlaylist brickd_UserSpotifyPlaylist[]
+  brickd_BuildEventGiveaway  brickd_BuildEventGiveaway[]
+
+  @@index([uuid])
+  @@index([themeId])
+  @@index([userId])
+  @@index([ageGroupId])
+  @@index([createdAt])
+  @@index([isActive, inLegoCatalog])
+  @@index([vendorId])
+  @@index([isRetired, isGWP, isMOC, inLegoCatalog])
+  @@index([year])
+  @@index([numberOfParts])
+}
+
+model brickd_SetMinifigs {
+  minifig      brickd_Minifig @relation(fields: [figureNumber], references: [figureNumber])
+  figureNumber String
+  set          brickd_Set     @relation(fields: [setNumber], references: [setNumber])
+  setNumber    String
+  createdAt    DateTime
+
+  @@id([figureNumber, setNumber, createdAt])
+  @@index([setNumber])
+  @@index([figureNumber])
+}
+
+model brickd_MinifigPricing {
+  id        Int            @id @default(autoincrement())
+  uuid      String         @unique @default(uuid()) @db.VarChar(50)
+  minifig   brickd_Minifig @relation(fields: [minifigId], references: [id])
+  minifigId Int
+  totalSold Int?
+  avgPrice  Float?
+  createdAt DateTime
+  updatedAt DateTime
+
+  @@index([minifigId])
+}
+
+model brickd_Minifig {
+  id                        Int                                @id @default(autoincrement())
+  uuid                      String                             @unique @default(uuid()) @db.VarChar(50)
+  figureNumber              String                             @unique @db.VarChar(255)
+  name                      String
+  shortName                 String?
+  description               String?                            @db.VarChar(2000)
+  numberOfParts             Int
+  slug                      String?
+  figureImageUrl            String                             @db.VarChar(255)
+  isEmptyImage              Int                                @default(0) @db.SmallInt
+  imageSource               String?                            @default("REBRICKABLE")
+  bricklinkId               String?
+  lastBricklinkCheck        DateTime?
+  createdAt                 DateTime
+  updatedAt                 DateTime
+  minifigsInSets            brickd_SetMinifigs[]
+  brickd_MinifigTemp        brickd_MinifigTemp?
+  userCollectionMinifigItem brickd_UserCollectionMinifigItem[]
+  proposedEdits             brickd_MinifigProposeEdit[]
+  minifigViews              brickd_Views[]
+  minifigPricing            brickd_MinifigPricing[]
+}
+
+model brickd_MediaToBeDeleted {
+  id                Int                    @id @default(autoincrement())
+  uuid              String                 @unique @default(uuid())
+  publicId          String
+  mediaType         MediaType              @default(ITEM)
+  altMediaKey       String?
+  mediaThumbnailKey String?
+  mediaSource       MediaSourceType        @default(CLOUDINARY)
+  status            MediaDeletionQueueType @default(QUEUED)
+  error             String?
+  userId            Int?
+  updatedAt         DateTime
+  createdAt         DateTime
+  deletedAt         DateTime?
+}
+
+model brickd_DiscussionFeatured {
+  id            Int                @id @default(autoincrement())
+  uuid          String             @unique @default(uuid())
+  discussion    brickd_Discussion? @relation(fields: [discussionId], references: [id])
+  discussionId  Int?
+  actorId       Int
+  hasSentEmail  Int                @default(0)
+  startFeatured DateTime
+  endFeatured   DateTime?
+  createdAt     DateTime
+
+  @@index([discussionId])
+}
+
+model brickd_BuilderCancellation {
+  id          Int          @id @default(autoincrement())
+  uuid        String       @unique @default(uuid())
+  userId      Int?
+  user        brickd_User? @relation(fields: [userId], references: [id])
+  signUpDate  DateTime?
+  cancelDate  DateTime
+  createdAt   DateTime
+  isCompleted Int          @default(0)
+  updatedAt   DateTime
+
+  @@index([userId])
+}
+
+model brickd_BuilderSignUpDate {
+  id        Int         @id @default(autoincrement())
+  uuid      String      @unique @default(uuid())
+  userId    Int         @unique
+  user      brickd_User @relation(fields: [userId], references: [id])
+  createdAt DateTime
+  updatedAt DateTime
+
+  @@index([userId])
+}
+
+model brickd_UsersToBeDeleted {
+  id           Int                    @id @default(autoincrement())
+  uuid         String                 @unique @default(uuid())
+  userId       Int
+  status       MediaDeletionQueueType @default(QUEUED)
+  isDeleted    Int                    @default(0)
+  isCancelled  Int                    @default(0)
+  timeTaken    Decimal?               @db.Decimal(16, 2)
+  itemsDeleted Int?
+  eligible     DateTime
+  updatedAt    DateTime
+  createdAt    DateTime
+
+  @@index([userId])
+}
+
+model brickd_UserCollectionInvitedMembers {
+  id           Int                   @id @default(autoincrement())
+  uuid         String                @unique @default(uuid())
+  user         brickd_User           @relation(fields: [userId], references: [id])
+  userId       Int
+  collection   brickd_UserCollection @relation(fields: [collectionId], references: [id])
+  collectionId Int
+  isAccepted   Int                   @default(0)
+  isDecline    Int                   @default(0)
+  actionDate   DateTime?
+  createdAt    DateTime
+
+  @@index([userId])
+  @@index([collectionId])
+}
+
+model brickd_UserCollectionMembers {
+  id           Int                   @id @default(autoincrement())
+  uuid         String                @unique @default(uuid())
+  collection   brickd_UserCollection @relation(fields: [collectionId], references: [id])
+  collectionId Int
+  user         brickd_User           @relation(fields: [userId], references: [id])
+  userId       Int
+  createdAt    DateTime
+
+  @@index([userId])
+  @@index([collectionId])
+}
+
+model brickd_UserCollectionMedia {
+  id           Int                     @id @default(autoincrement())
+  uuid         String                  @unique @default(uuid())
+  collection   brickd_UserCollection   @relation(fields: [collectionId], references: [id])
+  collectionId Int
+  isActive     Int                     @default(1)
+  mediaType    CollectionItemMediaType
+  mediaSource  MediaSourceType         @default(CLOUDINARY)
+  mediaRawUrl  String?
+  mediaKey     String?
+  mediaUrl     String
+  mediaAltKey  String?
+  createdAt    DateTime
+  userActivity brickd_UserActivity[]
+
+  @@index([collectionId])
+}
+
+model brickd_UserCollectionMinfigAutoImport {
+  id           Int                    @id @default(autoincrement())
+  uuid         String                 @unique @default(uuid())
+  collection   brickd_UserCollection? @relation(fields: [collectionId], references: [id])
+  collectionId Int?
+  user         brickd_User?           @relation(fields: [userId], references: [id])
+  userId       Int?
+  status       QueueProgress          @default(CREATED)
+  totalItems   Int?
+  currentCount Int?
+  updatedCount Int?
+  isDeleted    Int                    @default(0)
+  error        String?
+  timeTaken    Float?
+  createdAt    DateTime
+  updatedAt    DateTime
+  completedAt  DateTime?
+
+  @@index([userId])
+  @@index([collectionId])
+}
+
+model brickd_UserCollection {
+  id                           Int                                     @id @default(autoincrement())
+  uuid                         String                                  @unique @default(uuid())
+  name                         String
+  description                  String?                                 @db.Text
+  isWishList                   Int                                     @default(0)
+  isPrivate                    Int                                     @default(0)
+  isCollab                     Int                                     @default(0)
+  isBuilt                      Int                                     @default(0)
+  user                         brickd_User                             @relation(fields: [userId], references: [id])
+  userId                       Int
+  shortTag                     String?
+  isTestingCollection          Int                                     @default(0)
+  isRecommendedIgnore          Int                                     @default(0)
+  createdAt                    DateTime
+  updatedAt                    DateTime
+  isPublicList                 Int                                     @default(0)
+  isPublished                  Int                                     @default(1)
+  collectionType               CollectionType                          @default(SETS)
+  isAutoImport                 Int                                     @default(0)
+  isPinned                     Int                                     @default(0)
+  pinnedOrder                  Int?
+  collectionItems              brickd_UserCollectionItem[]
+  rebrickableLists             brickd_RebrickableList[]
+  collectionMembers            brickd_UserCollectionMembers[]
+  userNotifications            brickd_UserNotification[]
+  userCollectionInvitedMembers brickd_UserCollectionInvitedMembers[]
+  reportedContent              brickd_ReportContent[]
+  userCollectionDefault        brickd_UserCollectionDefault[]
+  generalAudienceUser          brickd_GeneralAudienceUser[]
+  importRequests               brickd_ImportRequest[]
+  userCollectionMedia          brickd_UserCollectionMedia[]
+  collectionViews              brickd_Views[]
+  userCollectionMinifigs       brickd_UserCollectionMinifigItem[]
+  userExports                  brickd_ExportRequest[]
+  userColletionMinifig         brickd_UserCollectionMinfigAutoImport[]
+  collectionLike               brickd_CollectionLike[]                 @relation("collectionLikes")
+  authCollectionLike           brickd_CollectionLike[]                 @relation("authCollectionLikes")
+  discussionCollections        brickd_Discussion[]
+
+  @@index([userId])
+  @@index([isTestingCollection, isWishList])
+  @@index([isWishList])
+  @@index([isTestingCollection, isWishList, id])
+  @@index([isRecommendedIgnore])
+  @@index([id, isRecommendedIgnore])
+}
+
+model brickd_UserFollows {
+  id        Int         @id @default(autoincrement())
+  uuid      String      @unique @default(uuid())
+  actorId   Int
+  follower  brickd_User @relation("Followers", fields: [actorId], references: [id])
+  following brickd_User @relation("Following", fields: [userId], references: [id])
+  userId    Int
+  createdAt DateTime
+
+  @@index([userId])
+  @@index([actorId])
+  @@index([userId, actorId])
+  @@index([actorId, userId])
+  @@index([userId, actorId, createdAt])
+}
+
+model brickd_UserLike {
+  id           Int                 @id @default(autoincrement())
+  uuid         String              @unique @default(uuid())
+  activityId   Int
+  activity     brickd_UserActivity @relation("likes", fields: [activityId], references: [id], map: "userLike_userActivity_fk")
+  authActivity brickd_UserActivity @relation("authLikes", fields: [activityId], references: [id], map: "authlike_userActivity_fk")
+  user         brickd_User         @relation(fields: [userId], references: [id])
+  userId       Int
+  createdAt    DateTime
+
+  @@index([activityId])
+  @@index([activityId, userId])
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@index([activityId, createdAt])
+}
+
+model brickd_UserDevice {
+  id                Int                 @id @default(autoincrement())
+  uuid              String              @unique @default(uuid())
+  deviceId          String              @unique
+  deviceName        String
+  platform          Platform            @default(APPLE)
+  token             String              @unique
+  user              brickd_User         @relation(fields: [userId], references: [id])
+  userId            Int
+  follows           Int                 @default(1)
+  general           Int                 @default(1)
+  likes             Int                 @default(1)
+  comments          Int                 @default(1)
+  chat              Int                 @default(1)
+  updatedAt         DateTime
+  createdAt         DateTime
+  brickd_UserStatus brickd_UserStatus[]
+
+  @@index([userId])
+}
+
+model brickd_UserDevicesRemoved {
+  id         Int         @id @default(autoincrement())
+  uuid       String      @unique @default(uuid())
+  response   String
+  token      String
+  deviceId   String
+  deviceName String
+  platform   Platform    @default(APPLE)
+  user       brickd_User @relation(fields: [userId], references: [id])
+  userId     Int
+  createdAt  DateTime
+
+  @@index([userId])
+}
+
+model brickd_UserNotification {
+  id                  Int                            @id @default(autoincrement())
+  uuid                String                         @unique @default(uuid())
+  nType               NotificationType               @default(LIKE)
+  commentId           Int?
+  comment             brickd_UserComment?            @relation(fields: [commentId], references: [id])
+  activityId          Int?
+  activity            brickd_UserActivity?           @relation(fields: [activityId], references: [id])
+  collectionItemId    Int?
+  collectionItem      brickd_UserCollectionItem?     @relation(fields: [collectionItemId], references: [id])
+  buildNoteId         Int?
+  buildNote           brickd_UserCollectionItemNote? @relation(fields: [buildNoteId], references: [id])
+  userId              Int?
+  collection          brickd_UserCollection?         @relation(fields: [collectionId], references: [id])
+  collectionId        Int?
+  discussion          brickd_Discussion?             @relation(fields: [discussionId], references: [id])
+  discussionId        Int?
+  discussionMessage   brickd_DiscussionMessage?      @relation(fields: [discussionMessageId], references: [id])
+  discussionMessageId Int?
+  setUpdate           brickd_SetUpdates?             @relation(fields: [updateId], references: [id])
+  updateId            Int?
+  user                brickd_User?                   @relation(name: "FollowUser", fields: [userId], references: [id])
+  actorUser           brickd_User                    @relation(name: "ActorUser", fields: [actorId], references: [id])
+  ownerUser           brickd_User                    @relation(name: "OwnerUser", fields: [ownerId], references: [id])
+  ownerId             Int
+  actorId             Int
+  createdAt           DateTime
+
+  @@index([activityId])
+  @@index([actorId])
+  @@index([userId])
+  @@index([ownerId])
+  @@index([commentId])
+  @@index([collectionItemId])
+  @@index([buildNoteId])
+  @@index([ownerId, createdAt, nType], name: "idx_notification_owner_created_nType")
+  @@index([nType, activityId, userId, collectionItemId, buildNoteId, collectionId, discussionId, discussionMessageId, createdAt])
+  @@index([ownerId, nType, collectionItemId, collectionId, discussionId, activityId, discussionMessageId, updateId, createdAt], name: "idx_usernotification_owner_grouping")
+  @@index([collectionId])
+  @@index([discussionId])
+  @@index([discussionMessageId])
+  @@index([userId, nType, createdAt])
+  @@index([updateId])
+}
+
+model brickd_ActivityCommentUnsubscriber {
+  id         Int                 @id @default(autoincrement())
+  uuid       String              @unique @default(uuid())
+  activityId Int
+  activity   brickd_UserActivity @relation(fields: [activityId], references: [id])
+  user       brickd_User         @relation(fields: [userId], references: [id])
+  userId     Int
+  createdAt  DateTime
+
+  @@index([userId])
+  @@index([activityId])
+}
+
+model brickd_DiscussionUnsubscriber {
+  id           Int               @id @default(autoincrement())
+  uuid         String            @unique @default(uuid())
+  duscussion   brickd_Discussion @relation(fields: [discussionId], references: [id], map: "authlike_userActivity_fk")
+  discussionId Int
+  user         brickd_User       @relation(fields: [userId], references: [id])
+  userId       Int
+  createdAt    DateTime
+
+  @@index([userId])
+  @@index([discussionId])
+  @@index([discussionId, userId], name: "idx_discunsub_discussion_user")
+}
+
+model brickd_UserComment {
+  id               Int                       @id @default(autoincrement())
+  uuid             String                    @unique @default(uuid())
+  message          String                    @db.Text
+  activityId       Int
+  activity         brickd_UserActivity       @relation(fields: [activityId], references: [id])
+  authHasComments  brickd_UserActivity       @relation("authHasComments", fields: [activityId], references: [id], map: "authHashComments_userActivity_fk")
+  user             brickd_User               @relation(fields: [userId], references: [id])
+  isActive         Int                       @default(1)
+  deletedDate      DateTime?
+  deletedUserId    Int?
+  isReply          Int                       @default(0)
+  userId           Int
+  createdAt        DateTime
+  updatedAt        DateTime?
+  reportedContent  brickd_ReportContent[]
+  userNotification brickd_UserNotification[]
+  userMentions     brickd_UserMention[]
+  commentReplies   brickd_UserCommentReply[] @relation("comments")
+  rawReplies       brickd_UserCommentReply[] @relation("reply")
+  userCommentLikes brickd_UserCommentLikes[] @relation("commentLikes")
+  authComments     brickd_UserCommentLikes[] @relation("authComments")
+  userCommentMedia brickd_UserCommentMedia[]
+
+  @@index([activityId])
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@index([activityId, userId])
+  @@index([activityId, createdAt])
+  @@index([activityId, isReply, isActive, userId, createdAt])
+}
+
+model brickd_UserCommentLikes {
+  id          Int                @id @default(autoincrement())
+  uuid        String             @unique @default(uuid())
+  commentId   Int
+  comment     brickd_UserComment @relation("commentLikes", fields: [commentId], references: [id], map: "commentLikes_UserComment_fk")
+  authComment brickd_UserComment @relation("authComments", fields: [commentId], references: [id], map: "authComments_UserComment_fk")
+  user        brickd_User        @relation(fields: [userId], references: [id])
+  userId      Int
+  createdAt   DateTime
+
+  @@index([commentId])
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@index([commentId, createdAt])
+}
+
+model brickd_UserCommentReply {
+  id        Int                @id @default(autoincrement())
+  uuid      String             @unique @default(uuid())
+  commentId Int
+  comment   brickd_UserComment @relation("comments", fields: [commentId], references: [id])
+  replyId   Int
+  reply     brickd_UserComment @relation("reply", fields: [replyId], references: [id])
+  createdAt DateTime
+
+  @@index([commentId])
+  @@index([replyId])
+}
+
+model brickd_UserMention {
+  id                  Int                            @id @default(autoincrement())
+  uuid                String                         @unique @default(uuid())
+  collectionItem      brickd_UserCollectionItem?     @relation(fields: [collectionItemId], references: [id])
+  collectionItemId    Int?
+  currentBuildNote    brickd_UserCollectionItemNote? @relation(fields: [buildNoteId], references: [id])
+  buildNoteId         Int?
+  comment             brickd_UserComment?            @relation(fields: [commentId], references: [id])
+  commentId           Int?
+  discussionMessage   brickd_DiscussionMessage?      @relation(fields: [discussionMessageId], references: [id])
+  discussionMessageId Int?
+  user                brickd_User                    @relation(fields: [userId], references: [id])
+  userId              Int
+  createdAt           DateTime
+
+  @@index([userId])
+  @@index([collectionItemId])
+  @@index([buildNoteId])
+  @@index([commentId])
+  @@index([discussionMessageId])
+}
+
+model brickd_UserActivity {
+  id                               Int                                           @id @default(autoincrement())
+  uuid                             String                                        @unique @default(uuid()) @db.VarChar(50)
+  user                             brickd_User                                   @relation(fields: [userId], references: [id])
+  activityType                     UserActivityType                              @default(NOTBUILT)
+  collectionItem                   brickd_UserCollectionItem?                    @relation(fields: [collectionItemId], references: [id])
+  collectionItemId                 Int?
+  collectionMinifig                brickd_UserCollectionMinifigItem?             @relation(fields: [collectionMinifigItemId], references: [id])
+  collectionMinifigItemId          Int?
+  buildStatus                      SetBuildStatus?
+  currentBuildNote                 brickd_UserCollectionItemNote?                @relation(fields: [buildNoteId], references: [id])
+  buildNoteId                      Int?
+  currentMedia                     brickd_UserCollectionItemMedia?               @relation(fields: [mediaId], references: [id])
+  mediaId                          Int?
+  parentMedia                      brickd_UserCollectionItemMediaGroupParent?    @relation(fields: [parentId], references: [id])
+  parentId                         Int?
+  isGroupItem                      Int                                           @default(0) @db.SmallInt
+  groupItem                        brickd_UserActivityCollectionItemGroup?       @relation(fields: [groupId], references: [id])
+  groupId                          Int?
+  collectionMedia                  brickd_UserCollectionMedia?                   @relation(fields: [collectionMediaId], references: [id])
+  collectionMediaId                Int?
+  discussion                       brickd_Discussion?                            @relation(fields: [discussionId], references: [id])
+  discussionId                     Int?
+  discussionRepost                 brickd_DiscussionRepost?                      @relation(fields: [discussionRepostId], references: [id])
+  discussionRepostId               Int?
+  buildEvent                       brickd_BuildEvent?                            @relation(fields: [eventId], references: [id])
+  eventId                          Int?
+  buildEventPost                   brickd_BuildEventPost?                        @relation(fields: [postId], references: [id])
+  postId                           Int?
+  userId                           Int
+  shouldShowLocation               Int                                           @default(0) @db.SmallInt
+  shortTag                         String?                                       @db.VarChar(50)
+  createdAt                        DateTime
+  likes                            brickd_UserLike[]                             @relation("likes")
+  authLikes                        brickd_UserLike[]                             @relation("authLikes")
+  authHasComments                  brickd_UserComment[]                          @relation("authHasComments")
+  comments                         brickd_UserComment[]
+  notifications                    brickd_UserNotification[]
+  reportedContent                  brickd_ReportContent[]
+  userAwards                       brickd_UserBuildChallengeLevels[]
+  activityCollectionItemGroupItems brickd_UserActivityCollectionItemGroupItems[]
+  activityCommentUnsubscribers     brickd_ActivityCommentUnsubscriber[]
+  activityViews                    brickd_Views[]
+  buildEventPostsHidden            brickd_BuildEventPostHidden[]
+
+  @@index([collectionItemId])
+  @@index([userId])
+  @@index([buildNoteId])
+  @@index([mediaId])
+  @@index([parentId])
+  @@index([groupId])
+  @@index([userId, isGroupItem, activityType, createdAt])
+  @@index([userId, isGroupItem, createdAt])
+  @@index([collectionMediaId])
+  @@index([discussionId])
+  @@index([collectionMinifigItemId])
+  @@index([discussionRepostId])
+  @@index([createdAt])
+  @@index([activityType])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([eventId])
+  @@index([isGroupItem, activityType])
+  @@index([postId])
+}
+
+model brickd_UserActivityCollectionItemGroup {
+  id             Int                                           @id @default(autoincrement())
+  uuid           String                                        @unique @default(uuid())
+  user           brickd_User                                   @relation(fields: [userId], references: [id])
+  userId         Int
+  createdAt      DateTime
+  userActivities brickd_UserActivity[]
+  groupItems     brickd_UserActivityCollectionItemGroupItems[]
+
+  @@index([userId])
+}
+
+model brickd_UserActivityCollectionItemGroupItems {
+  id                      Int                                    @id @default(autoincrement())
+  uuid                    String                                 @unique @default(uuid())
+  collectionItem          brickd_UserCollectionItem?             @relation(fields: [collectionItemId], references: [id])
+  collectionItemId        Int?
+  collectionMinifig       brickd_UserCollectionMinifigItem?      @relation(fields: [collectionMinifigItemId], references: [id])
+  collectionMinifigItemId Int?
+  parentGroup             brickd_UserActivityCollectionItemGroup @relation(fields: [groupId], references: [id])
+  activityId              Int?
+  activity                brickd_UserActivity?                   @relation(fields: [activityId], references: [id])
+  groupId                 Int
+  createdAt               DateTime
+
+  @@index([collectionItemId])
+  @@index([groupId])
+  @@index([activityId])
+  @@index([collectionMinifigItemId])
+}
+
+model brickd_UserCollectionItemMediaGroupParent {
+  id               Int                                   @id @default(autoincrement())
+  uuid             String                                @unique @default(uuid())
+  user             brickd_User                           @relation(fields: [userId], references: [id])
+  userId           Int
+  createdAt        DateTime
+  collectionItem   brickd_UserCollectionItem             @relation(fields: [collectionItemId], references: [id])
+  collectionItemId Int
+  medias           brickd_UserCollectionItemMediaGroup[]
+  userActivity     brickd_UserActivity[]
+
+  @@index([userId])
+  @@index([collectionItemId])
+}
+
+model brickd_UserCollectionItemMediaGroup {
+  id        Int                                       @id @default(autoincrement())
+  uuid      String                                    @unique @default(uuid())
+  media     brickd_UserCollectionItemMedia            @relation(fields: [mediaId], references: [id])
+  mediaId   Int
+  parent    brickd_UserCollectionItemMediaGroupParent @relation(fields: [parentId], references: [id])
+  parentId  Int
+  createdAt DateTime
+
+  @@index([mediaId])
+  @@index([parentId])
+}
+
+model brickd_UserBuildChallenge {
+  id          Int                   @id @default(autoincrement())
+  uuid        String                @unique @default(uuid())
+  user        brickd_User           @relation(fields: [userId], references: [id])
+  userId      Int
+  challenge   brickd_BuildChallenge @relation(fields: [challengeId], references: [id])
+  challengeId Int
+  joinedAt    DateTime
+
+  @@index([challengeId])
+  @@index([userId])
+}
+
+model brickd_BuildStreak {
+  id          Int          @id @default(autoincrement())
+  uuid        String       @unique @default(uuid())
+  user        brickd_User? @relation(fields: [userId], references: [id])
+  userId      Int?
+  streakCount Int
+  rank        Int
+  createdAt   DateTime
+
+  @@index([userId])
+}
+
+model brickd_BuildChallenge {
+  id                 Int                             @id @default(autoincrement())
+  uuid               String                          @unique @default(uuid())
+  name               String
+  description        String                          @db.Text
+  imageUrl           String?
+  type               ChallengeTypes                  @default(PIECES)
+  requireBuilt       Int                             @default(1)
+  isActive           Int                             @default(1)
+  isEndless          Int                             @default(0)
+  isLevel            Int                             @default(0)
+  position           Int                             @default(0)
+  isHidden           Int                             @default(0)
+  startTime          DateTime
+  endTime            DateTime
+  updatedAt          DateTime
+  createdAt          DateTime
+  userChallenges     brickd_UserBuildChallenge[]
+  challengeLevels    brickd_BuildChallengeLevels[]
+  challengeItemLists brickd_BuildChallengeItemList[]
+  challengeSetLists  brickd_BuildChallengeSetList[]
+}
+
+model brickd_BuildChallengeItemList {
+  id          Int                   @id @default(autoincrement())
+  uuid        String                @unique @default(uuid())
+  name        String
+  challenge   brickd_BuildChallenge @relation(fields: [challengeId], references: [id])
+  challengeId Int
+  type        ChallengeListType     @default(THEME)
+  listItemId  Int
+  createdAt   DateTime
+
+  @@index([challengeId])
+}
+
+model brickd_BuildChallengeSetList {
+  id          Int                   @id @default(autoincrement())
+  uuid        String                @unique @default(uuid())
+  name        String
+  challenge   brickd_BuildChallenge @relation(fields: [challengeId], references: [id])
+  challengeId Int
+  set         brickd_Set            @relation(fields: [setId], references: [id])
+  setId       Int
+  createdAt   DateTime
+
+  @@index([challengeId])
+  @@index([setId])
+}
+
+model brickd_UserBuildChallengeLevels {
+  id                    Int                               @id @default(autoincrement())
+  uuid                  String                            @unique @default(uuid())
+  level                 brickd_BuildChallengeLevels       @relation(fields: [levelId], references: [id])
+  levelId               Int
+  user                  brickd_User                       @relation(fields: [userId], references: [id])
+  userId                Int
+  shortTag              String                            @unique
+  collectionItem        brickd_UserCollectionItem?        @relation(fields: [collectionItemId], references: [id])
+  collectionItemId      Int?
+  collectionMinifigItem brickd_UserCollectionMinifigItem? @relation(fields: [collectionMinifigId], references: [id])
+  collectionMinifigId   Int?
+  activityId            Int?
+  activity              brickd_UserActivity?              @relation(fields: [activityId], references: [id])
+  createdAt             DateTime
+
+  @@index([levelId])
+  @@index([userId])
+  @@index([activityId])
+  @@index([collectionItemId])
+  @@index([collectionMinifigId])
+}
+
+model brickd_AppNoticeViewed {
+  id        Int              @id @default(autoincrement())
+  uuid      String           @unique @default(uuid())
+  user      brickd_User      @relation(fields: [userId], references: [id])
+  userId    Int
+  notice    brickd_AppNotice @relation(fields: [noticeId], references: [id])
+  noticeId  Int
+  ipAddress String
+  userAgent String?
+  createdAt DateTime
+
+  @@index([noticeId])
+  @@index([userId])
+}
+
+model brickd_SetReviewViewed {
+  id        Int               @id @default(autoincrement())
+  uuid      String            @unique @default(uuid())
+  user      brickd_User?      @relation(fields: [userId], references: [id])
+  userId    Int?
+  source    ReviewViewedType  @default(LANDING)
+  review    brickd_SetReview? @relation(fields: [reviewId], references: [id])
+  reviewId  Int?
+  ipAddress String
+  userAgent String?
+  isBot     Int               @default(0)
+  createdAt DateTime
+
+  @@index([userId])
+  @@index([reviewId])
+}
+
+model brickd_AppNoticeSeen {
+  id        Int              @id @default(autoincrement())
+  uuid      String           @unique @default(uuid())
+  user      brickd_User      @relation(fields: [userId], references: [id])
+  userId    Int
+  notice    brickd_AppNotice @relation(fields: [noticeId], references: [id])
+  action    AppNoticeAction  @default(CLOSE)
+  userAgent String?
+  noticeId  Int
+  createdAt DateTime
+
+  @@index([noticeId])
+  @@index([userId])
+}
+
+model brickd_AppNoticeAudience {
+  id            Int                            @id @default(autoincrement())
+  uuid          String                         @unique @default(uuid())
+  name          String
+  createdAt     DateTime
+  audienceUsers brickd_AppNoticeAudienceUser[]
+  appNotices    brickd_AppNotice[]
+}
+
+model brickd_GeneralAudience {
+  id               Int                          @id @default(autoincrement())
+  uuid             String                       @unique @default(uuid())
+  name             String
+  pushTitle        String?
+  pushBody         String?
+  pushImageUrl     String?
+  pushPath         String?
+  hasCustomPath    Int                          @default(0)
+  pushAnalyticsTag String?
+  pushUrl          String?
+  eventName        String?
+  type             AudienceTarget               @default(APP)
+  createdAt        DateTime
+  audienceUsers    brickd_GeneralAudienceUser[]
+}
+
+model brickd_GeneralAudienceUser {
+  id                Int                        @id @default(autoincrement())
+  uuid              String                     @unique @default(uuid())
+  user              brickd_User                @relation(fields: [userId], references: [id])
+  userId            Int
+  audience          brickd_GeneralAudience     @relation(fields: [audienceId], references: [id])
+  audienceId        Int
+  token             String?
+  email             String?
+  collection        brickd_UserCollection?     @relation(fields: [collectionId], references: [id])
+  collectionId      Int?
+  collectionItem    brickd_UserCollectionItem? @relation(fields: [collectionItemId], references: [id])
+  collectionItemId  Int?
+  variableNumber    Int?
+  customPath        String?
+  customText        String?
+  customUser        String?
+  customUserText    String?
+  customImage       String?
+  eventResponse     String?
+  payload           String?
+  pushResponse      brickd_PushResponses?      @relation(fields: [pushId], references: [id])
+  pushId            Int?
+  discussion        brickd_Discussion?         @relation(fields: [discussionId], references: [id])
+  discussionId      Int?
+  profileUser       brickd_User?               @relation(name: "profileUser", fields: [profileUserId], references: [id])
+  profileUserId     Int?
+  createdAt         DateTime
+  updatedAt         DateTime?
+  lastActive        DateTime?
+  appVersionNumeric Int?
+  status            AudienceGeneralUserType    @default(CREATED)
+
+  @@index([audienceId])
+  @@index([userId])
+  @@index([collectionItemId])
+  @@index([pushId])
+  @@index([collectionId])
+  @@index([discussionId])
+  @@index([profileUserId])
+}
+
+model brickd_AppNoticeAudienceUser {
+  id         Int                      @id @default(autoincrement())
+  uuid       String                   @unique @default(uuid())
+  user       brickd_User              @relation(fields: [userId], references: [id])
+  userId     Int
+  audience   brickd_AppNoticeAudience @relation(fields: [audienceId], references: [id])
+  audienceId Int
+  createdAt  DateTime
+
+  @@index([userId])
+  @@index([audienceId])
+}
+
+model brickd_SetImageEmbedding {
+  id        Int        @id @default(autoincrement())
+  uuid      String     @unique @default(uuid())
+  url       String
+  set       brickd_Set @relation(fields: [setId], references: [id])
+  setId     Int
+  createdAt DateTime
+  updatedAt DateTime?
+
+  @@index([setId])
+}
+
+model brickd_UserValidationToken {
+  id        Int         @id @default(autoincrement())
+  uuid      String      @unique @default(uuid())
+  user      brickd_User @relation(fields: [userId], references: [id])
+  reason    String?
+  userId    Int
+  token     String
+  userAgent String?
+  ipAddress String?
+  isUsed    Int         @default(0)
+  isExpired Int         @default(0)
+  usedDate  DateTime?
+  expiredAt DateTime
+  createdAt DateTime
+
+  @@index([userId])
+}
+
+model brickd_AppNotice {
+  id                 Int                       @id @default(autoincrement())
+  uuid               String                    @unique @default(uuid())
+  slug               String?
+  name               String
+  title              String
+  description        String
+  imageUrl           String?
+  path               String?
+  btnText            String?
+  type               AppNoticeAudience         @default(EVERYONE)
+  audience           brickd_AppNoticeAudience? @relation(fields: [audienceId], references: [id])
+  audienceId         Int?
+  isExternal         Int                       @default(0)
+  needsAuth          Int                       @default(0)
+  isCustomPath       Int                       @default(0)
+  percentageRollOut  Int                       @default(0)
+  url                String?
+  isActive           Int                       @default(1)
+  appVersionThrottle AppNoticeVersionRange     @default(GREATER)
+  appVersionNumeric  Int?
+  appVersion         String?
+  startDate          DateTime?
+  endDate            DateTime?
+  createdAt          DateTime
+  usersNoticeSeen    brickd_AppNoticeSeen[]
+  appNoticeViewed    brickd_AppNoticeViewed[]
+
+  @@index([audienceId])
+}
+
+model brickd_BuildChallengeLevels {
+  id                       Int                               @id @default(autoincrement())
+  uuid                     String                            @unique @default(uuid())
+  challenge                brickd_BuildChallenge             @relation(fields: [challengeId], references: [id])
+  challengeId              Int
+  level                    Int                               @default(1)
+  name                     String
+  description              String                            @db.Text
+  imageUrl                 String
+  value                    Int
+  createdAt                DateTime
+  userBuildChallengeLevels brickd_UserBuildChallengeLevels[]
+
+  @@index([challengeId])
+}
+
+model brickd_MinifigProposeEdit {
+  id             Int               @id @default(autoincrement())
+  uuid           String            @unique @default(uuid())
+  minifig        brickd_Minifig    @relation(fields: [minifigId], references: [id])
+  minifigId      Int
+  name           String
+  description    String?
+  imageUrl       String?
+  imageSource    String?
+  user           brickd_User?      @relation(fields: [userId], references: [id])
+  userId         Int?
+  status         ProposeEditStatus @default(PENDING)
+  decisionUserId Int?
+  isUpdated      Int               @default(0)
+  notes          String?
+  updatedAt      DateTime?
+  createdAt      DateTime
+
+  @@index([minifigId])
+  @@index([userId])
+}
+
+model brickd_UserCollectionMinifigMedia {
+  id                    Int                              @id @default(autoincrement())
+  uuid                  String                           @unique @default(uuid())
+  mediaUrl              String
+  mediaRawUrl           String?
+  mediaKey              String?
+  mediaAltKey           String?
+  mediaSource           MediaSourceType                  @default(CLOUDINARY)
+  mediaThumbnailKey     String?
+  mediaType             CollectionItemMediaType
+  position              Int                              @default(0)
+  collectionMinifigItem brickd_UserCollectionMinifigItem @relation(fields: [collectionMinifigId], references: [id])
+  collectionMinifigId   Int
+  createdAt             DateTime
+
+  @@index([collectionMinifigId])
+}
+
+model brickd_UserCollectionItemMedia {
+  id                Int                                   @id @default(autoincrement())
+  uuid              String                                @unique @default(uuid())
+  isPrivate         Int                                   @default(0)
+  collectionItem    brickd_UserCollectionItem             @relation(fields: [collectionItemId], references: [id])
+  collectionItemId  Int
+  position          Int?
+  isActive          Int                                   @default(1)
+  mediaUrl          String
+  mediaRawUrl       String?
+  mediaKey          String?
+  mediaAltKey       String?
+  mediaThumbnailKey String?
+  s3CreatedAt       DateTime?
+  mediaSource       MediaSourceType                       @default(CLOUDINARY)
+  mediaType         CollectionItemMediaType
+  itemNote          brickd_UserCollectionItemNote?        @relation(fields: [itemNoteId], references: [id])
+  itemNoteId        Int?
+  createdAt         DateTime
+  userActivity      brickd_UserActivity[]
+  mediaGroup        brickd_UserCollectionItemMediaGroup[]
+  mediaWatched      brickd_MediaWatched[]
+  mediaViewed       brickd_MediaViewed[]
+
+  @@index([collectionItemId])
+  @@index([itemNoteId])
+}
+
+model brickd_UserCollectionMinifigItem {
+  id                              Int                                           @id @default(autoincrement())
+  uuid                            String                                        @unique @default(uuid())
+  collection                      brickd_UserCollection                         @relation(fields: [collectionId], references: [id])
+  collectionId                    Int
+  user                            brickd_User                                   @relation(fields: [userId], references: [id])
+  userId                          Int
+  notes                           String?                                       @db.Text
+  minifig                         brickd_Minifig                                @relation(fields: [minifigId], references: [id])
+  minifigId                       Int
+  location                        brickd_Location?                              @relation(fields: [locationId], references: [id])
+  locationId                      Int?
+  shortTag                        String
+  quantity                        Int                                           @default(1)
+  isAutoImported                  Int?                                          @default(0) @db.SmallInt
+  addedAt                         DateTime?
+  updatedAt                       DateTime
+  createdAt                       DateTime
+  media                           brickd_UserCollectionMinifigMedia[]
+  userActivity                    brickd_UserActivity[]
+  userActivityGroupItems          brickd_UserActivityCollectionItemGroupItems[]
+  userViews                       brickd_Views[]
+  brickd_UserBuildChallengeLevels brickd_UserBuildChallengeLevels[]
+
+  @@index([minifigId])
+  @@index([collectionId])
+  @@index([userId])
+  @@index([locationId])
+  @@index([userId, createdAt])
+}
+
+model brickd_UserCollectionItem {
+  id                          Int                                           @id @default(autoincrement())
+  uuid                        String                                        @unique @default(uuid()) @db.VarChar(50)
+  collection                  brickd_UserCollection                         @relation(fields: [collectionId], references: [id])
+  collectionId                Int
+  setActivity                 brickd_Set                                    @relation(name: "activitySet", fields: [setId], references: [id], map: "actvitySet_users_fk")
+  set                         brickd_Set                                    @relation(name: "collectionSet", fields: [setId], references: [id], map: "collectionSet_users_fk")
+  setId                       Int
+  notes                       String?                                       @db.VarChar(2000)
+  buildStatus                 SetBuildStatus                                @default(NOTBUILT)
+  setCondition                ItemCondition?
+  addedAt                     DateTime?
+  builtDate                   DateTime?
+  purchaseDate                DateTime?
+  rating                      Float?
+  shortTag                    String?                                       @db.VarChar(50)
+  userBacklog                 brickd_User?                                  @relation(name: "userCollectionBacklog", fields: [userId], references: [id], map: "userCollectionBuilds_users_fk")
+  user                        brickd_User?                                  @relation(name: "userCollectionItems", fields: [userId], references: [id], map: "userCollection_users_fk")
+  userId                      Int?
+  location                    brickd_Location?                              @relation(fields: [locationId], references: [id])
+  locationId                  Int?
+  quantity                    Int                                           @default(1)
+  position                    Int?                                          @db.SmallInt
+  totalDuration               Int?
+  createdAt                   DateTime
+  updatedAt                   DateTime
+  isImported                  Int                                           @default(0)
+  media                       brickd_UserCollectionItemMedia[]
+  buildNotes                  brickd_UserCollectionItemNote[]
+  userActivity                brickd_UserActivity[]
+  reportedContent             brickd_ReportContent[]
+  groupParentMedia            brickd_UserCollectionItemMediaGroupParent[]
+  userMentions                brickd_UserMention[]
+  userNotifications           brickd_UserNotification[]
+  generalAudience             brickd_GeneralAudienceUser[]
+  setsViewed                  brickd_SetsViewed[]
+  userCollectionActivityItems brickd_UserActivityCollectionItemGroupItems[]
+  userAwards                  brickd_UserBuildChallengeLevels[]
+  userViews                   brickd_Views[]
+  userCollectionItemChildren  brickd_UserCollectionItemChildren[]
+
+  @@index([setId, collectionId, buildStatus, userId])
+  @@index([setId])
+  @@index([collectionId])
+  @@index([setId, userId])
+  @@index([setId, collectionId])
+  @@index([buildStatus, setId, collectionId])
+  @@index([userId])
+  @@index([userId, updatedAt(sort: Desc)])
+  @@index([userId, builtDate])
+  @@index([userId, createdAt])
+  @@index([locationId])
+  @@index([userId, collectionId])
+  @@index([userId, setId])
+  @@index([userId, buildStatus, builtDate, collectionId])
+  @@index([userId, buildStatus, builtDate, createdAt, collectionId])
+  @@index([userId, buildStatus])
+}
+
+model brickd_UserCollectionItemChildren {
+  id               Int                       @id @default(autoincrement())
+  uuid             String                    @unique @default(uuid()) @db.VarChar(50)
+  notes            String?                   @db.VarChar(2000)
+  buildStatus      SetBuildStatus            @default(NOTBUILT)
+  setCondition     ItemCondition?
+  collectionItem   brickd_UserCollectionItem @relation(fields: [collectionItemId], references: [id])
+  collectionItemId Int
+  builtDate        DateTime?
+  createdAt        DateTime
+  updatedAt        DateTime
+
+  @@index([collectionItemId])
+}
+
+model brickd_YearInBrickUser {
+  id              Int          @id @default(autoincrement())
+  uuid            String       @unique @default(uuid()) @db.VarChar(500)
+  user            brickd_User? @relation(fields: [userId], references: [id])
+  userId          Int?
+  itemCount       Int
+  collectionCount Int
+  dataUrl         String
+  dataUrlStatus   Int
+  isAppNotice     Int          @default(0) @db.SmallInt
+  isPush          Int          @default(0) @db.SmallInt
+  isEmail         Int          @default(0) @db.SmallInt
+  isFollowUpEmail Int          @default(0) @db.SmallInt
+  emailResponse   String?      @db.VarChar(1000)
+  lastSeen        DateTime?
+  emailSentAt     DateTime?
+  followUpSentAt  DateTime?
+  createdAt       DateTime
+
+  @@index([userId])
+}
+
+model brickd_LinkClick {
+  id        Int          @id @default(autoincrement())
+  uuid      String       @unique @default(uuid()) @db.VarChar(500)
+  user      brickd_User? @relation(fields: [userId], references: [id])
+  userId    Int?
+  url       String
+  ipAddress String?
+  userAgent String?
+  context   LinkSource   @default(ACTIVITY)
+  createdAt DateTime
+
+  @@index([userId])
+}
+
+model brickd_UserRecap {
+  id              Int                      @id @default(autoincrement())
+  uuid            String                   @unique @default(uuid()) @db.VarChar(500)
+  user            brickd_User?             @relation(fields: [userId], references: [id])
+  userId          Int?
+  dataUrl         String
+  reportDate      DateTime
+  timeTaken       Decimal?                 @db.Decimal(16, 2)
+  emailResponse   String?
+  status          QueueProgress            @default(QUEUED)
+  statusDate      DateTime?
+  emailTimeTaken  Decimal?                 @db.Decimal(16, 2)
+  emailSentAt     DateTime?
+  createdAt       DateTime
+  updatedAt       DateTime?
+  userRecapEvents brickd_UserRecapEvents[]
+
+  @@unique([userId, reportDate])
+  @@index([userId])
+}
+
+model brickd_YearInBrickEvents {
+  id        Int                   @id @default(autoincrement())
+  uuid      String                @unique @default(uuid()) @db.VarChar(500)
+  eventType YearInBricksEventType @default(VIEWED)
+  storyType String?               @db.VarChar(100)
+  user      brickd_User?          @relation(fields: [userId], references: [id])
+  source    String?               @db.VarChar(100)
+  year      String
+  ipAddress String?
+  userAgent String?
+  userId    Int?
+  createdAt DateTime
+
+  @@index([userId])
+}
+
+model brickd_PromotionUrlClick {
+  id          Int                @id @default(autoincrement())
+  uuid        String             @unique @default(uuid())
+  type        UrlClickType       @default(PROMOTION)
+  promotion   brickd_Promotions? @relation(fields: [promoId], references: [id])
+  promoId     Int?
+  userId      Int?
+  user        brickd_User?       @relation(fields: [userId], references: [id])
+  ipAddress   String
+  userAgent   String?
+  isBot       Int                @default(0)
+  referer     String?
+  countryCode String?
+  latitude    Float?
+  longitude   Float?
+  regionName  String?
+  cityName    String?
+  zipCode     String?
+  createdAt   DateTime
+
+  @@index([userId])
+  @@index([promoId])
+}
+
+model brickd_PromotionViewed {
+  id        Int                @id @default(autoincrement())
+  uuid      String             @unique @default(uuid()) @db.VarChar(500)
+  user      brickd_User?       @relation(fields: [userId], references: [id])
+  userId    Int
+  promotion brickd_Promotions? @relation(fields: [promoId], references: [id])
+  promoId   Int
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime
+
+  @@index([promoId])
+  @@index([userId])
+}
+
+model brickd_PromotionsAttempts {
+  id         Int          @id @default(autoincrement())
+  uuid       String       @unique @default(uuid()) @db.VarChar(500)
+  user       brickd_User? @relation(fields: [userId], references: [id])
+  criteria   String?
+  userId     Int
+  promoCount Int
+  createdAt  DateTime
+
+  @@index([userId])
+}
+
+model brickd_FollowViaPromotedUser {
+  id        Int      @id @default(autoincrement())
+  uuid      String   @unique @default(uuid()) @db.VarChar(500)
+  actorId   Int
+  userId    Int
+  createdAt DateTime
+
+  @@index([userId])
+}
+
+model brickd_Promotions {
+  id               Int                            @id @default(autoincrement())
+  uuid             String                         @unique @default(uuid()) @db.VarChar(500)
+  targetingType    PromotionTargetingType         @default(REGION)
+  user             brickd_User?                   @relation(fields: [userId], references: [id])
+  userId           Int
+  title            String
+  subTitle         String
+  body             String?
+  imageUrl         String
+  btnText          String?
+  link             String?
+  loopsEventKey    String?
+  ratio            Float?
+  isSponsored      Int                            @default(1)
+  isEmail          Int                            @default(1)
+  isActive         Int                            @default(1)
+  isAdminOnly      Int                            @default(0)
+  hasContest       Int                            @default(0)
+  latitude         Float?                         @db.DoublePrecision
+  longitude        Float?                         @db.DoublePrecision
+  radius           Int?
+  startDate        DateTime
+  endDate          DateTime
+  createdAt        DateTime
+  updatedAt        DateTime
+  regionList       brickd_PromotionsRegionList[]
+  userEarned       brickd_PromotionsEarned[]
+  countryList      brickd_PromotionsCountryList[]
+  promotionsViews  brickd_PromotionViewed[]
+  urlClicks        brickd_PromotionUrlClick[]
+  promotionWinners brickd_PromotionsWinner[]
+
+  @@index([latitude, longitude, isActive, startDate, endDate])
+  @@index([isActive, startDate, endDate])
+  @@index([userId])
+}
+
+model brickd_PromotionsRegionList {
+  id        Int                @id @default(autoincrement())
+  uuid      String             @unique @default(uuid()) @db.VarChar(500)
+  promotion brickd_Promotions? @relation(fields: [promoId], references: [id])
+  promoId   Int
+  region    String
+  createdAt DateTime
+
+  @@index([promoId])
+}
+
+model brickd_PromotionsCountryList {
+  id        Int                @id @default(autoincrement())
+  uuid      String             @unique @default(uuid()) @db.VarChar(500)
+  promotion brickd_Promotions? @relation(fields: [promoId], references: [id])
+  promoId   Int
+  country   String
+  createdAt DateTime
+
+  @@index([promoId])
+}
+
+model brickd_PromotionsWinner {
+  id        Int                @id @default(autoincrement())
+  uuid      String             @unique @default(uuid()) @db.VarChar(500)
+  user      brickd_User?       @relation(fields: [userId], references: [id])
+  userId    Int
+  position  Int
+  promotion brickd_Promotions? @relation(fields: [promoId], references: [id])
+  promoId   Int
+  status    PromoWinnerStatus  @default(CREATED)
+  updatedAt DateTime?
+  createdAt DateTime
+
+  @@index([promoId])
+  @@index([userId])
+}
+
+model brickd_PromotionsEarned {
+  id        Int                @id @default(autoincrement())
+  uuid      String             @unique @default(uuid()) @db.VarChar(500)
+  user      brickd_User?       @relation(fields: [userId], references: [id])
+  userId    Int
+  promotion brickd_Promotions? @relation(fields: [promoId], references: [id])
+  promoId   Int
+  createdAt DateTime
+
+  @@index([promoId])
+  @@index([userId])
+}
+
+model brickd_UserLocation {
+  id               Int          @id @default(autoincrement())
+  uuid             String       @unique @default(uuid()) @db.VarChar(500)
+  ipAddress        String
+  user             brickd_User? @relation(fields: [userId], references: [id])
+  userId           Int
+  city             String?
+  region           String?
+  country          String?
+  countryCode      String?
+  latitude         Float?       @db.DoublePrecision
+  longitude        Float?       @db.DoublePrecision
+  requestCreatedAt DateTime
+  createdAt        DateTime
+  updatedAt        DateTime?
+
+  @@unique([userId, ipAddress])
+  @@index([userId])
+}
+
+model brickd_UserRecapEvents {
+  id        Int                   @id @default(autoincrement())
+  uuid      String                @unique @default(uuid()) @db.VarChar(500)
+  eventType YearInBricksEventType @default(VIEWED)
+  storyType String?               @db.VarChar(100)
+  recap     brickd_UserRecap?     @relation(fields: [recapId], references: [id])
+  recapId   Int?
+  user      brickd_User?          @relation(fields: [userId], references: [id])
+  source    String?               @db.VarChar(100)
+  ipAddress String?
+  userAgent String?
+  userId    Int?
+  createdAt DateTime
+
+  @@index([userId])
+  @@index([recapId])
+}
+
+model brickd_UserCollectionItemNote {
+  id                Int                              @id @default(autoincrement())
+  uuid              String                           @unique @default(uuid())
+  collectionItem    brickd_UserCollectionItem        @relation(fields: [collectionItemId], references: [id])
+  collectionItemId  Int
+  user              brickd_User?                     @relation(fields: [userId], references: [id])
+  userId            Int?
+  status            SetBuildStatusForNotes           @default(BUILDING)
+  bagNumber         String?
+  notes             String?                          @db.Text
+  createdAt         DateTime
+  updatedAt         DateTime
+  shortTag          String                           @unique
+  duration          Int?
+  media             brickd_UserCollectionItemMedia[]
+  userActivity      brickd_UserActivity[]
+  userMentions      brickd_UserMention[]
+  userNotifications brickd_UserNotification[]
+
+  @@index([collectionItemId])
+  @@index([userId])
+  @@index([userId, createdAt])
+}
+
+model brickd_SetsTemp {
+  id        Int         @id @default(autoincrement())
+  set_num   String?     @unique
+  name      String
+  year      Int
+  theme_id  Int
+  num_parts Int
+  img_url   String
+  set       brickd_Set? @relation(fields: [set_num], references: [setNumber])
+}
+
+model brickd_MinifigTemp {
+  id                           Int                            @id @default(autoincrement())
+  fig_num                      String                         @unique
+  name                         String
+  num_parts                    Int
+  img_url                      String
+  minifig                      brickd_Minifig?                @relation(fields: [fig_num], references: [figureNumber])
+  brickd_InventoryMinifigsTemp brickd_InventoryMinifigsTemp[]
+}
+
+model brickd_ThemeTemp {
+  id       Int           @id @default(autoincrement())
+  theme_id Int           @unique
+  name     String
+  theme    brickd_Theme? @relation(fields: [theme_id], references: [rebrickableId])
+}
+
+model brickd_InventoryTemp {
+  id                           Int                            @id @default(autoincrement())
+  inventoryId                  Int                            @unique
+  version                      Int
+  set_num                      String
+  createdAt                    DateTime
+  brickd_InventoryMinifigsTemp brickd_InventoryMinifigsTemp[]
+}
+
+model brickd_InventoryMinifigsTemp {
+  id          Int                  @id @default(autoincrement())
+  inventory   brickd_InventoryTemp @relation(fields: [inventoryId], references: [inventoryId])
+  inventoryId Int
+  figure      brickd_MinifigTemp   @relation(fields: [figNumber], references: [fig_num])
+  figNumber   String
+  createdAt   DateTime
+
+  @@index([figNumber])
+  @@index([inventoryId])
+}
+
+model brickd_Waitlist {
+  id        Int      @id @default(autoincrement())
+  uuid      String   @unique @default(uuid())
+  email     String   @unique
+  createdAt DateTime
+}
+
+model brickd_IngestReport {
+  id             Int            @id @default(autoincrement())
+  uuid           String         @unique @default(uuid())
+  ingestType     IngestType     @default(THEMES)
+  progress       IngestProgress @default(START)
+  updatedRecords Int            @default(0)
+  indexRecords   Int            @default(0)
+  totalRecords   Int            @default(0)
+  newRecords     Int            @default(0)
+  isComplete     Int            @default(0)
+  isError        Int            @default(0)
+  timeTaken      Decimal?       @db.Decimal(16, 2)
+  error          String?        @db.Text
+  indexResponse  String?        @db.Text
+  createdAt      DateTime
+  updatedAt      DateTime
+}
+
+model brickd_SignWithAppleRequestFailure {
+  id          Int      @id @default(autoincrement())
+  uuid        String   @default(uuid())
+  response    String   @db.Text
+  appleUserId String   @unique
+  deviceId    String
+  token       String?  @db.Text
+  createdAt   DateTime
+}
+
+model brickd_SignWithGoogleFailures {
+  id            Int               @id @default(autoincrement())
+  uuid          String            @default(uuid())
+  typeOfError   GoogleSignInError @default(OTHER)
+  response      String            @db.Text
+  email         String?
+  isEmailLinked Int               @default(0)
+  createdAt     DateTime
+}
+
+model brickd_SignWithAppleRequest {
+  id          Int      @id @default(autoincrement())
+  uuid        String   @default(uuid())
+  email       String
+  appleUserId String   @unique
+  fullName    String
+  deviceId    String
+  token       String?  @db.Text
+  updatedAt   DateTime
+  createdAt   DateTime
+}
+
+model brickd_LegoColors {
+  id            Int      @id @default(autoincrement())
+  uuid          String   @default(uuid())
+  rebrickableId Int      @unique
+  isTransparent Int      @default(0)
+  name          String
+  colorHex      String
+  createdAt     DateTime
+}
+
+model brickd_UserAppVersion {
+  id                Int         @id @default(autoincrement())
+  uuid              String      @default(uuid())
+  user              brickd_User @relation(fields: [userId], references: [id])
+  userId            Int
+  appVersion        String
+  appVersionNumeric Int?
+  deviceId          String
+  deviceName        String
+  osVersion         String
+  platform          Platform    @default(APPLE)
+  createdAt         DateTime
+  updatedAt         DateTime
+
+  @@index([userId])
+  @@index([userId, deviceId, platform])
+  @@index([userId, updatedAt(sort: Desc)])
+}
+
+model brickd_UserAppActivity {
+  id                Int         @id @default(autoincrement())
+  uuid              String      @default(uuid())
+  user              brickd_User @relation(fields: [userId], references: [id])
+  userId            Int
+  appVersion        String
+  appVersionNumeric Int?
+  deviceId          String
+  platform          Platform    @default(APPLE)
+  createdAt         DateTime
+
+  @@index([userId])
+  @@index([userId, deviceId, platform])
+}
+
+model brickd_LoopsRequest {
+  id          Int             @id @default(autoincrement())
+  uuid        String          @unique @default(uuid()) @db.VarChar(50)
+  user        brickd_User     @relation(fields: [userId], references: [id])
+  userId      Int
+  requestType LoopRequestType
+  error       Int             @default(0) @db.SmallInt
+  payload     String?         @db.VarChar(1000)
+  response    String?         @db.VarChar(1000)
+  updatedAt   DateTime
+  createdAt   DateTime
+
+  @@index([userId])
+}
+
+model brickd_ExploreLists {
+  id          Int          @id @default(autoincrement())
+  uuid        String       @unique @default(uuid())
+  listType    ExploreLists @default(BUYINGGUIDE)
+  isActive    Int          @default(1)
+  startDate   DateTime
+  endDate     DateTime
+  imageUrl    String
+  shareUrl    String?
+  title       String
+  description String
+  createdAt   DateTime
+}
+
+model brickd_SetReleaseList {
+  id          Int            @id @default(autoincrement())
+  uuid        String         @unique @default(uuid())
+  releaseSlug String         @unique
+  isActive    Int            @default(1)
+  imageUrl    String?
+  shareUrl    String?
+  title       String
+  description String?
+  startDate   DateTime
+  endDate     DateTime
+  createdAt   DateTime
+  listViews   brickd_Views[]
+}
+
+model brickd_IndexRequest {
+  id        Int             @id @default(autoincrement())
+  uuid      String          @default(uuid())
+  user      brickd_User     @relation(fields: [userId], references: [id])
+  userId    Int
+  status    SearchIndexType
+  response  String?
+  error     String?
+  timeTaken Decimal?        @db.Decimal(16, 2)
+  updatedAt DateTime
+  createdAt DateTime
+
+  @@index([userId])
+}
+
+model brickd_SetMarketplaceClick {
+  id          Int                    @id @default(autoincrement())
+  uuid        String                 @default(uuid())
+  item        brickd_SetMarketplace? @relation(fields: [itemId], references: [id])
+  itemId      Int?
+  ipAddress   String
+  user        brickd_User?           @relation(fields: [userId], references: [id])
+  userId      Int?
+  userAgent   String?
+  isBot       Int                    @default(0)
+  countryCode String?
+  latitude    Float?
+  longitude   Float?
+  regionName  String?
+  cityName    String?
+  zipCode     String?
+  createdAt   DateTime
+
+  @@index([itemId])
+  @@index([userId])
+}
+
+model brickd_Country {
+  id                  Int                                            @id @default(autoincrement())
+  uuid                String                                         @default(uuid())
+  name                String
+  codeShort           String
+  codeLong            String?
+  createdAt           DateTime
+  vendorInCountry     brickd_SetMarketplaceVendor[]
+  usersInCountry      brickd_User[]
+  setReviewCreators   brickd_SetReviewCreator[]
+  locations           brickd_Location[]
+  countryVendorGroups brickd_SetMarketplaceVendorCountryGroupItems[]
+}
+
+model brickd_SetMarketplaceVendorCountryGroup {
+  id        Int                                            @id @default(autoincrement())
+  uuid      String                                         @default(uuid())
+  name      String
+  createdAt DateTime
+  countries brickd_SetMarketplaceVendorCountryGroupItems[]
+  vendors   brickd_SetMarketplaceVendor[]
+}
+
+model brickd_SetMarketplaceVendorCountryGroupItems {
+  id           Int                                     @id @default(autoincrement())
+  uuid         String                                  @default(uuid())
+  countryGroup brickd_SetMarketplaceVendorCountryGroup @relation(fields: [groupId], references: [id])
+  groupId      Int                                     @default(1)
+  country      brickd_Country                          @relation(fields: [countryId], references: [id])
+  countryId    Int
+  createdAt    DateTime
+
+  @@index([groupId])
+  @@index([countryId])
+}
+
+model brickd_SetMarketplaceVendor {
+  id                                  Int                                      @id @default(autoincrement())
+  uuid                                String                                   @default(uuid())
+  name                                String
+  url                                 String
+  imageUrl                            String
+  country                             brickd_Country                           @relation(fields: [countryId], references: [id])
+  countryId                           Int
+  countryGroup                        brickd_SetMarketplaceVendorCountryGroup? @relation(fields: [groupId], references: [id])
+  groupId                             Int?
+  countryCode                         String
+  currencySymbol                      String
+  currencyCode                        String
+  isManual                            Int                                      @default(0)
+  isActive                            Int                                      @default(1)
+  setVendor                           brickd_SetVendor?                        @relation(fields: [setVendorId], references: [id])
+  setVendorId                         Int?
+  createdAt                           DateTime
+  updatedAt                           DateTime
+  setMarketPlace                      brickd_SetMarketplace[]
+  setMarketplaceRefersh               brickd_SetMarketplaceRefresh[]
+  setMarketplaceIgnored               brickd_SetMarketplaceIgnored[]
+  setPriceChanges                     brickd_SetMarketplacePriceChange[]
+  setMarketplaceIgnoredItem           brickd_SetMarketplaceIgnoredItem[]
+  priceAlertHistory                   brickd_SetMarketplacePriceHistory[]
+  brickd_SetMarketplacePriceChangeLog brickd_SetMarketplacePriceChangeLog[]
+  brickd_LegoScapeFailure             brickd_LegoScapeFailure[]
+
+  @@index([countryId])
+  @@index([groupId])
+  @@index([setVendorId])
+}
+
+model brickd_SetMarketplaceRefresh {
+  id             Int                                   @id @default(autoincrement())
+  uuid           String                                @unique @default(uuid()) @db.VarChar(50)
+  setId          Int
+  url            String?                               @db.VarChar(1000)
+  set            brickd_Set                            @relation(fields: [setId], references: [id])
+  item           brickd_SetMarketplace?                @relation(fields: [itemId], references: [id])
+  itemId         Int?
+  price          Float?
+  productId      String?                               @db.VarChar(1000)
+  status         SearchIndexType                       @default(QUEUED)
+  vendor         brickd_SetMarketplaceVendor           @relation(fields: [vendorId], references: [id])
+  vendorId       Int                                   @default(1) @db.SmallInt
+  isSkipped      Int                                   @default(0) @db.SmallInt
+  response       String?                               @db.Text
+  timeTaken      Decimal?                              @db.Decimal(16, 2)
+  isBatch        Int?                                  @default(0) @db.SmallInt
+  isError        Int                                   @default(0) @db.SmallInt
+  taskId         String?                               @db.VarChar(50)
+  logUrl         String?                               @db.VarChar(255)
+  lambdaResponse String?                               @db.VarChar(1000)
+  logName        String?                               @db.VarChar(255)
+  statusCode     Int?                                  @db.SmallInt
+  updatedAt      DateTime
+  createdAt      DateTime
+  source         MarketplaceRefreshSource?
+  alertLog       brickd_SetMarketplaceAlertLog[]
+  changeLog      brickd_SetMarketplacePriceChangeLog[]
+
+  @@index([itemId])
+  @@index([setId])
+  @@index([vendorId])
+  @@index([statusCode, isSkipped, vendorId])
+  @@index([itemId, vendorId])
+  @@index([status, isSkipped])
+  @@index([setId, createdAt])
+  @@index([createdAt])
+}
+
+model brickd_CrawlStats {
+  id        Int        @id @default(autoincrement())
+  uuid      String     @default(uuid())
+  userAgent String
+  set       brickd_Set @relation(fields: [setId], references: [id])
+  setId     Int
+  url       String
+  createdAt DateTime
+
+  @@index([setId])
+}
+
+model brickd_IgnoreSuggestedUser {
+  id        Int         @id @default(autoincrement())
+  uuid      String      @unique @default(uuid()) @db.VarChar(50)
+  actorId   Int
+  user      brickd_User @relation(fields: [userId], references: [id])
+  userId    Int
+  createdAt DateTime
+
+  @@index([userId])
+  @@index([userId, actorId])
+}
+
+model brickd_IgnoredRecommendedSet {
+  id        Int         @id @default(autoincrement())
+  uuid      String      @unique @default(uuid()) @db.VarChar(50)
+  user      brickd_User @relation(fields: [userId], references: [id])
+  userId    Int
+  set       brickd_Set  @relation(fields: [setId], references: [id])
+  setId     Int
+  createdAt DateTime
+
+  @@index([userId])
+  @@index([setId])
+  @@index([userId, setId])
+}
+
+model brickd_UserRecommendationPreferences {
+  id             Int                          @id @default(autoincrement())
+  uuid           String                       @unique @default(uuid()) @db.VarChar(50)
+  user           brickd_User                  @relation(fields: [userId], references: [id])
+  userId         Int
+  pieceCountPref UserRecommmendationPieceSize @default(ALL)
+  parentId       Int
+  parentTheme    brickd_ParentTheme           @relation(fields: [parentId], references: [id])
+  createdAt      DateTime
+
+  @@index([userId])
+  @@index([parentId])
+}
+
+model brickd_PromotedUser {
+  id        Int          @id @default(autoincrement())
+  uuid      String       @unique @default(uuid()) @db.VarChar(50)
+  user      brickd_User? @relation(fields: [userId], references: [id])
+  userId    Int?
+  position  Int
+  isActive  Int          @default(1)
+  createdAt DateTime
+  updatedAt DateTime?
+  startDate DateTime?
+  endDate   DateTime?
+
+  @@index([userId])
+  @@index([isActive, userId])
+}
+
+model brickd_PromotedUserView {
+  id         Int              @id @default(autoincrement())
+  uuid       String           @unique @default(uuid()) @db.VarChar(50)
+  user       brickd_User?     @relation(fields: [userUuid], references: [uuid])
+  userUuid   String?
+  userId     Int?
+  actorId    Int
+  ipAddress  String?          @db.VarChar(255)
+  userAgent  String?          @db.VarChar(255)
+  source     PromotedUserView @default(FEED)
+  isViewable Int              @default(0)
+  createdAt  DateTime
+
+  @@index([userUuid])
+}
+
+model brickd_BrowserRequest {
+  id             Int      @id @default(autoincrement())
+  uuid           String   @unique @default(uuid()) @db.VarChar(50)
+  ipAddress      String?  @db.VarChar(255)
+  userAgent      String?  @db.VarChar(255)
+  browser        String?  @db.VarChar(255)
+  browserVersion String?  @db.VarChar(255)
+  page           String   @db.VarChar(1000)
+  isBlockedViaIP Int      @default(0) @db.SmallInt
+  isBot          Int      @default(0) @db.SmallInt
+  createdAt      DateTime
+}
+
+model brickd_SetMarketplaceIgnoredItem {
+  id        Int                         @id @default(autoincrement())
+  uuid      String                      @default(uuid())
+  vendor    brickd_SetMarketplaceVendor @relation(fields: [vendorId], references: [id])
+  vendorId  Int
+  set       brickd_Set                  @relation(fields: [setId], references: [id])
+  setId     Int
+  productId String
+  createdAt DateTime
+
+  @@index([vendorId])
+  @@index([setId])
+}
+
+model brickd_SetMarketplaceIgnored {
+  id        Int                         @id @default(autoincrement())
+  uuid      String                      @default(uuid())
+  vendor    brickd_SetMarketplaceVendor @relation(fields: [vendorId], references: [id])
+  vendorId  Int
+  url       String?
+  set       brickd_Set                  @relation(fields: [setId], references: [id])
+  setId     Int
+  reason    MarketplaceIgnoreReason     @default(NOTFOUND)
+  createdAt DateTime
+
+  @@index([setId])
+  @@index([vendorId])
+}
+
+model brickd_LegoScapeFailure {
+  id        Int                         @id @default(autoincrement())
+  uuid      String                      @default(uuid())
+  vendor    brickd_SetMarketplaceVendor @relation(fields: [vendorId], references: [id])
+  vendorId  Int
+  url       String?
+  set       brickd_Set                  @relation(fields: [setId], references: [id])
+  setId     Int
+  status    Int
+  response  String?
+  createdAt DateTime
+
+  @@index([setId])
+  @@index([vendorId])
+}
+
+model brickd_SetMarketplace {
+  id                        Int                                @id @default(autoincrement())
+  uuid                      String                             @unique @default(uuid()) @db.VarChar(50)
+  setId                     Int
+  vendorProductId           String?                            @db.VarChar(255)
+  url                       String?                            @db.VarChar(1000)
+  set                       brickd_Set                         @relation(fields: [setId], references: [id])
+  vendor                    brickd_SetMarketplaceVendor        @relation(fields: [vendorId], references: [id])
+  vendorId                  Int
+  availability              MarketplaceAvailability            @default(OUTOFSTOCK)
+  productType               MarketplaceProductType             @default(NEW)
+  price                     Float
+  user                      brickd_User?                       @relation(fields: [userId], references: [id])
+  userId                    Int?
+  affilateLink              String?                            @db.VarChar(255)
+  isApproved                Int                                @default(0) @db.SmallInt
+  createdAt                 DateTime
+  updatedAt                 DateTime
+  setMarketplaceRefresh     brickd_SetMarketplaceRefresh[]
+  setMarketplaceClick       brickd_SetMarketplaceClick[]
+  setMarketplacePriceChange brickd_SetMarketplacePriceChange[]
+
+  @@index([availability])
+  @@index([setId])
+  @@index([vendorId])
+  @@index([vendorProductId, vendorId])
+  @@index([setId, vendorId])
+  @@index([setId, price])
+  @@index([userId])
+  @@index([setId, price, vendorId, isApproved])
+}
+
+model brickd_SetOfDay {
+  id           Int          @id @default(autoincrement())
+  uuid         String       @default(uuid())
+  setId        Int
+  set          brickd_Set   @relation(fields: [setId], references: [id])
+  selectedDate DateTime
+  type         SetOfDayType
+  createdAt    DateTime
+  updatedAt    DateTime
+
+  @@index([setId])
+}
+
+model brickd_ReleaseNotes {
+  id               Int                         @id @default(autoincrement())
+  uuid             String                      @default(uuid())
+  name             String
+  notes            String
+  imageUrl         String?
+  appVersion       String
+  platform         ReleaseNotePlatform         @default(ALL)
+  appBuild         Int?
+  isActive         Int                         @default(0)
+  createdAt        DateTime
+  updatedAt        DateTime
+  releaseNoteViews brickd_ReleaseNotesViewed[]
+}
+
+model brickd_ReleaseNotesViewed {
+  id            Int                 @id @default(autoincrement())
+  uuid          String              @default(uuid())
+  user          brickd_User?        @relation(fields: [userId], references: [id])
+  userId        Int?
+  releaseNote   brickd_ReleaseNotes @relation(fields: [releaseNoteId], references: [id])
+  platform      Platform            @default(APPLE)
+  releaseNoteId Int
+  createdAt     DateTime
+
+  @@index([userId])
+  @@index([releaseNoteId])
+}
+
+model brickd_RevenueCatWebhook {
+  id        Int            @id @default(autoincrement())
+  uuid      String         @default(uuid())
+  response  String         @db.Text()
+  platform  UserSocialType @default(APPLE)
+  createdAt DateTime
+}
+
+model brickd_RevenueRawCatWebhook {
+  id        Int      @id @default(autoincrement())
+  uuid      String   @default(uuid())
+  response  String?  @db.Text()
+  createdAt DateTime
+}
+
+model brickd_BuildEventSet {
+  id         Int               @id @default(autoincrement())
+  uuid       String            @default(uuid())
+  set        brickd_Set        @relation(fields: [setId], references: [id])
+  setId      Int
+  buildEvent brickd_BuildEvent @relation(fields: [eventId], references: [id])
+  eventId    Int
+  createdAt  DateTime
+
+  @@index([eventId])
+  @@index([setId])
+}
+
+model brickd_BuildEventMedia {
+  id                Int                     @id @default(autoincrement())
+  uuid              String                  @unique @default(uuid())
+  event             brickd_BuildEvent       @relation(fields: [eventId], references: [id])
+  eventId           Int
+  user              brickd_User             @relation(fields: [userId], references: [id])
+  userId            Int
+  mediaType         CollectionItemMediaType
+  mediaSource       MediaSourceType         @default(CLOUDINARY)
+  mediaRawUrl       String
+  mediaKey          String
+  mediaAltKey       String?
+  mediaThumbnailKey String?
+  mediaUrl          String
+  createdAt         DateTime
+
+  @@index([eventId])
+  @@index([userId])
+}
+
+model brickd_BuildEventLike {
+  id        Int               @id @default(autoincrement())
+  uuid      String            @unique @default(uuid())
+  user      brickd_User       @relation(fields: [userId], references: [id])
+  userId    Int
+  event     brickd_BuildEvent @relation(name: "likes", fields: [eventId], references: [id])
+  authLike  brickd_BuildEvent @relation("authLike", fields: [eventId], references: [id], map: "authlike_eventLike_fk")
+  eventId   Int
+  createdAt DateTime
+
+  @@index([eventId])
+  @@index([userId])
+}
+
+model brickd_BuildEventInvited {
+  id         Int               @id @default(autoincrement())
+  uuid       String            @unique @default(uuid())
+  user       brickd_User       @relation(fields: [userId], references: [id])
+  userId     Int
+  buildEvent brickd_BuildEvent @relation(fields: [eventId], references: [id])
+  eventId    Int
+  actorId    Int
+  createdAt  DateTime
+
+  @@index([eventId])
+  @@index([userId])
+}
+
+model brickd_BuildEventCommunication {
+  id              Int               @id @default(autoincrement())
+  uuid            String            @unique @default(uuid())
+  event           brickd_BuildEvent @relation(fields: [eventId], references: [id])
+  eventId         Int
+  isEventUpcoming Int               @default(0)
+  isEventHere     Int               @default(0)
+  target          AudienceTarget    @default(EMAIL)
+  createdAt       DateTime
+  updatedAt       DateTime
+
+  @@index([eventId])
+}
+
+model brickd_BuildEventPost {
+  id           Int                          @id @default(autoincrement())
+  uuid         String                       @unique @default(uuid())
+  event        brickd_BuildEvent            @relation(fields: [eventId], references: [id])
+  eventId      Int
+  user         brickd_User                  @relation(fields: [userId], references: [id])
+  userId       Int
+  message      String?
+  isActive     Int                          @default(1)
+  createdAt    DateTime
+  updatedAt    DateTime
+  media        brickd_BuildEventPostMedia[]
+  postActivity brickd_UserActivity[]
+
+  @@index([eventId])
+  @@index([userId])
+}
+
+model brickd_BuildEventPostMedia {
+  id                Int                     @id @default(autoincrement())
+  uuid              String                  @unique @default(uuid())
+  eventPost         brickd_BuildEventPost   @relation(fields: [eventPostId], references: [id])
+  eventPostId       Int
+  isActive          Int                     @default(1)
+  mediaType         CollectionItemMediaType
+  mediaSource       MediaSourceType         @default(CLOUDINARY)
+  mediaRawUrl       String?
+  mediaKey          String?
+  mediaThumbnailKey String?
+  mediaUrl          String
+  mediaAltKey       String?
+  createdAt         DateTime
+
+  @@index([eventPostId])
+}
+
+model brickd_BuildEvent {
+  id                              Int                                   @id @default(autoincrement())
+  uuid                            String                                @unique @default(uuid())
+  user                            brickd_User                           @relation(fields: [userId], references: [id])
+  userId                          Int
+  slug                            String?
+  startDate                       DateTime
+  endDate                         DateTime
+  isPrivate                       Int                                   @default(0)
+  title                           String
+  link                            String?
+  description                     String?
+  createdAt                       DateTime
+  updatedAt                       DateTime
+  isPublished                     Int                                   @default(0)
+  isDeleted                       Int                                   @default(0)
+  deletedDate                     DateTime?
+  inPersonEvent                   Int                                   @default(0)
+  location                        brickd_Location?                      @relation(fields: [locationId], references: [id])
+  locationId                      Int?
+  isMOC                           Int                                   @default(0)
+  eventMembers                    brickd_BuildEventMember[]             @relation("members")
+  authEventMember                 brickd_BuildEventMember[]             @relation("authMember")
+  eventDiscussions                brickd_BuildEventDiscussion[]
+  buildEventSets                  brickd_BuildEventSet[]
+  eventActivty                    brickd_UserActivity[]
+  eventMedia                      brickd_BuildEventMedia[]
+  buildEventChatMessages          brickd_ChatMessage[]
+  eventLikes                      brickd_BuildEventLike[]               @relation("likes")
+  authLike                        brickd_BuildEventLike[]               @relation("authLike")
+  reportedContent                 brickd_ReportContent[]
+  buildEventInvites               brickd_BuildEventInvited[]
+  eventViews                      brickd_Views[]
+  buildEventDiscussions           brickd_Discussion[]
+  buildEventUnreadDiscussionCount brickd_BuildEventDiscussionLastRead[]
+  buildCommunications             brickd_BuildEventCommunication[]
+  buildEventPosts                 brickd_BuildEventPost[]
+  buildEventPostsHidden           brickd_BuildEventPostHidden[]
+  buildEventMemberCheckin         brickd_BuildEventMemberCheckin[]
+  buildEventGiveaways             brickd_BuildEventGiveaway[]
+  buildEventAdmins                brickd_BuildEventAdmin[]
+
+  @@index([userId])
+  @@index([locationId])
+}
+
+model brickd_BuildEventDiscussionLastRead {
+  id        Int               @id @default(autoincrement())
+  uuid      String            @unique @default(uuid())
+  user      brickd_User       @relation(fields: [userId], references: [id])
+  userId    Int
+  event     brickd_BuildEvent @relation(fields: [eventId], references: [id])
+  eventId   Int
+  lastRead  DateTime
+  createdAt DateTime
+
+  @@index([eventId])
+  @@index([userId])
+}
+
+model brickd_BuildEventDiscussion {
+  id                   Int                               @id @default(autoincrement())
+  uuid                 String                            @unique @default(uuid())
+  user                 brickd_User                       @relation(fields: [userId], references: [id])
+  userId               Int
+  event                brickd_BuildEvent                 @relation(fields: [eventId], references: [id])
+  eventId              Int
+  text                 String
+  isSticky             Int                               @default(0)
+  isDeleted            Int                               @default(0)
+  deletedDate          DateTime?
+  discussionLike       brickd_BuildEventDiscussionLike[] @relation("likes")
+  authDiscussionLike   brickd_BuildEventDiscussionLike[] @relation("authLikes")
+  replyId              Int?
+  createdAt            DateTime
+  brickd_ReportContent brickd_ReportContent[]
+
+  @@index([userId])
+  @@index([eventId])
+}
+
+model brickd_BuildEventDiscussionLike {
+  id          Int                         @id @default(autoincrement())
+  uuid        String                      @unique @default(uuid())
+  message     brickd_BuildEventDiscussion @relation(name: "likes", fields: [messageId], references: [id])
+  authMessage brickd_BuildEventDiscussion @relation("authLikes", fields: [messageId], references: [id], map: "authlike_userActivity_fk")
+  messageId   Int
+  user        brickd_User                 @relation(fields: [userId], references: [id])
+  userId      Int
+  createdAt   DateTime
+
+  @@index([userId])
+  @@index([messageId])
+}
+
+model brickd_BuildEventMember {
+  id            Int               @id @default(autoincrement())
+  uuid          String            @default(uuid())
+  user          brickd_User       @relation(fields: [userId], references: [id])
+  userId        Int
+  event         brickd_BuildEvent @relation(name: "members", fields: [eventId], references: [id])
+  authEvent     brickd_BuildEvent @relation("authMember", fields: [eventId], references: [id], map: "authMember_fk")
+  eventId       Int
+  isSuspended   Int               @default(0)
+  suspendedDate DateTime?
+  isCreator     Int               @default(0)
+  createdAt     DateTime
+
+  @@index([eventId])
+  @@index([userId])
+}
+
+model brickd_BuildEventMemberCheckin {
+  id         Int               @id @default(autoincrement())
+  uuid       String            @default(uuid())
+  user       brickd_User       @relation(fields: [userId], references: [id])
+  userId     Int
+  buildEvent brickd_BuildEvent @relation(fields: [eventId], references: [id])
+  method     String            @default("LINK")
+  eventId    Int
+  createdAt  DateTime
+
+  @@index([eventId])
+  @@index([userId])
+}
+
+model brickd_BuildEventGiveawayWinnerLog {
+  id         Int                       @id @default(autoincrement())
+  uuid       String                    @unique @default(uuid())
+  user       brickd_User               @relation(fields: [userId], references: [id])
+  userId     Int
+  giveaway   brickd_BuildEventGiveaway @relation(fields: [giveawayId], references: [id])
+  giveawayId Int
+  isClaimed  Int                       @default(0)
+  isSkipped  Int                       @default(0)
+  expiresAt  DateTime
+  updatedAt  DateTime
+  createdAt  DateTime
+
+  @@index([giveawayId])
+  @@index([userId])
+}
+
+model brickd_BuildEventAdmin {
+  id        Int               @id @default(autoincrement())
+  uuid      String            @default(uuid())
+  user      brickd_User       @relation(fields: [userId], references: [id])
+  userId    Int
+  event     brickd_BuildEvent @relation(fields: [eventId], references: [id])
+  eventId   Int
+  createdAt DateTime
+
+  @@index([eventId])
+  @@index([userId])
+}
+
+model brickd_BuildEventGiveaway {
+  id                 Int                                  @id @default(autoincrement())
+  uuid               String                               @default(uuid())
+  userId             Int
+  title              String
+  description        String?
+  imageKey           String?
+  imageUrl           String?
+  isPublished        Int                                  @default(0)
+  buildEvent         brickd_BuildEvent                    @relation(fields: [eventId], references: [id])
+  eventId            Int
+  setId              Int?
+  set                brickd_Set?                          @relation(fields: [setId], references: [id])
+  winner             brickd_User?                         @relation(fields: [winnerId], references: [id])
+  winnerId           Int?
+  winnerLocked       Int                                  @default(0)
+  winnerSelectedDate DateTime?
+  createdAt          DateTime
+  winnerLog          brickd_BuildEventGiveawayWinnerLog[]
+
+  @@index([eventId])
+  @@index([userId])
+  @@index([winnerId])
+  @@index([setId])
+}
+
+model brickd_BuilderTransaction {
+  id                Int                           @id @default(autoincrement())
+  uuid              String                        @default(uuid())
+  user              brickd_User?                  @relation(fields: [userId], references: [id])
+  userId            Int?
+  duration          BuilderSubscriptionDuration   @default(MON)
+  platform          UserSocialType                @default(APPLE)
+  productIdentifier String
+  transactionType   BuilderTransactionType        @default(SUBSCRIBED)
+  subscriptionType  BuilderSubscriptionType?      @default(INIT)
+  environment       BuilderTransactionEnvironment @default(SANDBOX)
+
+  rawTransactionType String?
+  rawBody            String?
+  isFree             Int      @default(0)
+  giftDuration       String?
+  createdAt          DateTime
+
+  @@index([userId])
+}
+
+model brickd_PushResponses {
+  id                     Int                             @id @default(autoincrement())
+  uuid                   String                          @unique @default(uuid()) @db.VarChar(50)
+  user                   brickd_User                     @relation(fields: [userId], references: [id])
+  userId                 Int
+  notificationId         Int
+  token                  String                          @db.VarChar(1000)
+  pushResult             PushResult                      @default(SUCCESS)
+  pushType               NotificationType                @default(LIKE)
+  response               String                          @db.VarChar(1000)
+  platform               Platform                        @default(APPLE)
+  createdAt              DateTime
+  generalAudienceUser    brickd_GeneralAudienceUser[]
+  setMarketplaceAlertLog brickd_SetMarketplaceAlertLog[]
+
+  @@index([userId])
+}
+
+model brickd_QueueRequests {
+  id            Int           @id @default(autoincrement())
+  uuid          String        @default(uuid())
+  totalRecords  Int           @default(0)
+  totalInserted Int           @default(0)
+  progress      QueueProgress @default(QUEUED)
+  createdAt     DateTime
+  updatedAt     DateTime
+  timeTaken     Decimal?      @db.Decimal(16, 2)
+  error         String?
+}
+
+model brickd_CloudinaryError {
+  id        Int                 @id @default(autoincrement())
+  uuid      String              @default(uuid())
+  source    CloudinaryErrorType @default(OTHER)
+  user      brickd_User?        @relation(fields: [userId], references: [id])
+  userId    Int?
+  platform  Platform            @default(APPLE)
+  osVersion String?
+  error     String?             @db.Text
+  createdAt DateTime
+
+  @@index([userId])
+}
+
+model brickd_RevenueCatError {
+  id        Int          @id @default(autoincrement())
+  uuid      String       @default(uuid())
+  user      brickd_User? @relation(fields: [userId], references: [id])
+  userId    Int?
+  platform  Platform     @default(APPLE)
+  error     String?      @db.Text
+  createdAt DateTime
+
+  @@index([userId])
+}
+
+model brickd_BlockedIp {
+  id                  Int      @id @default(autoincrement())
+  uuid                String   @unique @default(uuid()) @db.VarChar(50)
+  ipAddress           String   @unique
+  cloudlareListItemId String
+  reason              String?
+  updatedAt           DateTime
+  createdAt           DateTime
+}
+
+model brickd_Requests {
+  id           Int          @id @default(autoincrement())
+  uuid         String       @unique @default(uuid()) @db.VarChar(50)
+  user         brickd_User? @relation(fields: [userId], references: [id])
+  userId       Int?
+  url          String       @db.VarChar(1000)
+  appVersion   String?
+  appBuild     Int?
+  method       String?      @db.VarChar(100)
+  platform     String?      @db.VarChar(50)
+  countryCode  String?      @db.VarChar(50)
+  languageCode String?      @db.VarChar(50)
+  params       String?
+  postParams   String?
+  ipAddress    String?      @db.VarChar(255)
+  userAgent    String?      @db.VarChar(1000)
+  isBot        Int          @default(0)
+  createdAt    DateTime
+  ingestedAt   DateTime?
+
+  @@index([createdAt, userId])
+  @@index([createdAt, userId, isBot])
+  @@index([ipAddress, createdAt])
+  @@index([ipAddress])
+  @@index([userId, ipAddress, createdAt])
+  @@index([userAgent, createdAt, userId])
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@index([createdAt])
+}
+
+model brickd_MoveAuditLog {
+  id                      Int            @id @default(autoincrement())
+  uuid                    String         @unique @default(uuid())
+  collectionItemId        Int?
+  collectionMinifigItemId Int?
+  collectionType          CollectionType @default(SETS)
+  oldCollectionId         Int
+  newCollectionId         Int
+  createdAt               DateTime
+}
+
+model brickd_DeleteCollectionItemLog {
+  id               Int                        @id @default(autoincrement())
+  uuid             String                     @unique @default(uuid())
+  collectionItemId Int
+  userId           Int
+  reason           DeleteCollectionItemReason @default(DELETEITEM)
+  createdAt        DateTime
+
+  @@index([collectionItemId])
+}
+
+model brickd_SignInRequests {
+  id         Int               @id @default(autoincrement())
+  uuid       String            @unique @default(uuid())
+  user       brickd_User?      @relation(fields: [userId], references: [id])
+  userId     Int?
+  source     SignUpSource      @default(APP)
+  status     SignInRequestType @default(STARTED)
+  userAgent  String?
+  error      String?
+  appBuild   Int?
+  platform   String?
+  appVersion String?
+  isNewUser  Int               @default(0)
+  ipAddress  String
+  createdAt  DateTime
+  updatedAt  DateTime
+
+  @@index([userId])
+}
+
+model brickd_LastNotificationRead {
+  id        Int         @id @default(autoincrement())
+  uuid      String      @unique @default(uuid())
+  user      brickd_User @relation(fields: [userId], references: [id])
+  userId    Int
+  lastRead  DateTime
+  createdAt DateTime
+
+  @@index([userId])
+}
+
+model brickd_SupportTicket {
+  id                 Int                        @id @default(autoincrement())
+  uuid               String                     @unique @default(uuid())
+  typeOfTicket       SupportTicketType          @default(OTHER)
+  message            String                     @db.Text
+  user               brickd_User?               @relation(fields: [userId], references: [id])
+  userId             Int?
+  name               String?
+  email              String?
+  ipAddress          String
+  deviceName         String?
+  deviceUuid         String?
+  osVersion          String?
+  appVersion         String?
+  appBuild           String?
+  platform           String?
+  createdAt          DateTime
+  supportTicketFiles brickd_SupportTicketFile[]
+
+  @@index([userId])
+}
+
+model brickd_SupportTicketFile {
+  id        Int                  @id @default(autoincrement())
+  uuid      String               @unique @default(uuid())
+  ticket    brickd_SupportTicket @relation(fields: [ticketId], references: [id])
+  ticketId  Int
+  mediaUrl  String
+  createdAt DateTime
+
+  @@index([ticketId])
+}
+
+model brickd_OAuthLogging {
+  id        Int      @id @default(autoincrement())
+  uuid      String   @unique @default(uuid())
+  state     String?
+  createdAt DateTime
+}
+
+model brickd_OpenAiRequests {
+  id          Int             @id @default(autoincrement())
+  uuid        String          @unique @default(uuid())
+  user        brickd_User     @relation(fields: [userId], references: [id])
+  userId      Int
+  didFind     Int?            @default(1)
+  prompt      String?
+  reason      String?
+  status      AIStatusType?
+  error       String?
+  response    String?         @db.Text
+  base64Image String?         @db.Text
+  s3ImageUrl  String?
+  feedback    AIFeedbackType?
+  setId       Int?
+  set         brickd_Set?     @relation(fields: [setId], references: [id])
+  version     Int             @default(1)
+  timeTaken   Decimal?        @db.Decimal(16, 2)
+  updatedAt   DateTime?
+  createdAt   DateTime
+
+  @@index([userId])
+  @@index([setId])
+}
+
+model brickd_ShortUrlClick {
+  id          Int          @id @default(autoincrement())
+  uuid        String       @default(uuid())
+  type        UrlClickType @default(COLLECTION)
+  tag         String
+  ipAddress   String
+  userAgent   String?
+  isBot       Int          @default(0)
+  referer     String?
+  countryCode String?
+  latitude    Float?
+  longitude   Float?
+  regionName  String?
+  cityName    String?
+  zipCode     String?
+  createdAt   DateTime
+}
+
+model brickd_QRScan {
+  id         Int             @id @default(autoincrement())
+  uuid       String          @default(uuid())
+  url        String
+  status     ImportQueueType @default(STARTED)
+  found      Int             @default(1)
+  setNumber  String?
+  set        brickd_Set?     @relation(fields: [setId], references: [id])
+  setId      Int?
+  user       brickd_User     @relation(fields: [userId], references: [id])
+  qrScanType QRScanType      @default(QR)
+  userId     Int
+  updatedAt  DateTime
+  createdAt  DateTime
+
+  @@index([userId])
+  @@index([setId])
+}
+
+model brickd_ChatRule {
+  id         Int      @id @default(autoincrement())
+  uuid       String   @unique @default(uuid())
+  ruleNumber Int
+  title      String
+  body       String   @db.Text
+  updatedAt  DateTime
+  createdAt  DateTime
+}
+
+model brickd_ChatRuleAcceptance {
+  id        Int          @id @default(autoincrement())
+  uuid      String       @unique @default(uuid())
+  user      brickd_User? @relation(fields: [userId], references: [id])
+  userId    Int?
+  updatedAt DateTime?
+  createdAt DateTime
+
+  @@index([userId])
+}
+
+model brickd_Chat {
+  id              Int                    @id @default(autoincrement())
+  uuid            String                 @unique @default(uuid())
+  updatedAt       DateTime?
+  createdAt       DateTime
+  usersInChat     brickd_UserChat[]
+  chatMessages    brickd_ChatMessage[]
+  reportedContent brickd_ReportContent[]
+  chatLastRead    brickd_ChatLastRead[]
+}
+
+model brickd_ImportRequestFailedItem {
+  id               Int                       @id @default(autoincrement())
+  uuid             String                    @unique @default(uuid())
+  request          brickd_ImportRequest      @relation(fields: [importId], references: [id])
+  importId         Int
+  failedReason     ImportRequestFailedReason @default(INVALID)
+  collectionItemId Int?
+  setNumber        String
+  setName          String?
+  createdAt        DateTime
+
+  @@index([importId])
+}
+
+model brickd_ImportRequest {
+  id                       Int                              @id @default(autoincrement())
+  uuid                     String                           @unique @default(uuid())
+  user                     brickd_User?                     @relation(fields: [userId], references: [id])
+  userId                   Int?
+  importType               ImportRequestType                @default(REBRICKABLE)
+  collectionName           String?
+  collection               brickd_UserCollection?           @relation(fields: [collectionId], references: [id])
+  isCollectionDeleted      Int                              @default(0)
+  collectionId             Int?
+  fileUrl                  String?
+  isPrivate                Int?
+  isBuilt                  Int?
+  status                   QueueProgress                    @default(RUNNING)
+  timeTaken                Float?
+  error                    String?
+  totalItems               Int
+  actualTotalItems         Int                              @default(0)
+  insertedItems            Int                              @default(0)
+  skippedItems             Int                              @default(0)
+  updatedItems             Int                              @default(0)
+  failureItems             Int                              @default(0)
+  isCompleted              Int                              @default(0)
+  createdAt                DateTime
+  updatedAt                DateTime
+  importRequestItemsFailed brickd_ImportRequestFailedItem[]
+
+  @@index([collectionId])
+  @@index([userId])
+}
+
+model brickd_ExportRequest {
+  id           Int                    @id @default(autoincrement())
+  uuid         String                 @unique @default(uuid())
+  user         brickd_User?           @relation(fields: [userId], references: [id])
+  userId       Int?
+  collection   brickd_UserCollection? @relation(fields: [collectionId], references: [id])
+  collectionId Int?
+  fileUrl      String?
+  status       QueueProgress          @default(RUNNING)
+  timeTaken    Float?
+  error        String?
+  isCompleted  Int                    @default(0)
+  createdAt    DateTime
+  updatedAt    DateTime
+
+  @@index([collectionId])
+  @@index([userId])
+}
+
+model brickd_OverallStats {
+  id              Int      @id @default(autoincrement())
+  uuid            String   @unique @default(uuid())
+  totalPieces     Int
+  totalSets       Int
+  totalUniqueSets Int
+  totalUsers      Int
+  createdAt       DateTime
+}
+
+model brickd_Location {
+  id                               Int                                @id @default(autoincrement())
+  uuid                             String                             @unique @default(uuid())
+  imageUrl                         String?
+  isOnline                         Int                                @default(1)
+  fullAddress                      String?
+  name                             String
+  address                          String?
+  city                             String?
+  region                           String?
+  latitude                         Decimal?                           @db.Decimal(10, 4)
+  longitude                        Decimal?                           @db.Decimal(10, 4)
+  placeIconUrl                     String?
+  isOnlineGlobal                   Int                                @default(0)
+  country                          brickd_Country                     @relation(fields: [countryId], references: [id])
+  countryId                        Int
+  url                              String?
+  googlePlaceId                    String?
+  updatedAt                        DateTime?
+  createdAt                        DateTime
+  userCollectionItems              brickd_UserCollectionItem[]
+  discussions                      brickd_Discussion[]
+  brickd_UserCollectionMinifigItem brickd_UserCollectionMinifigItem[]
+  brickd_BuildEvent                brickd_BuildEvent[]
+
+  @@index([countryId])
+}
+
+model brickd_ChatLastRead {
+  id       Int         @id @default(autoincrement())
+  uuid     String      @unique @default(uuid())
+  chat     brickd_Chat @relation(fields: [chatId], references: [id])
+  chatId   Int
+  user     brickd_User @relation(fields: [userId], references: [id])
+  userId   Int
+  lastRead DateTime
+
+  @@index([userId])
+  @@index([chatId])
+}
+
+model brickd_ChatMessageUrlClicks {
+  id          Int                @id @default(autoincrement())
+  uuid        String             @unique @default(uuid())
+  message     brickd_ChatMessage @relation(fields: [messageId], references: [id])
+  messageId   Int
+  url         String
+  user        brickd_User?       @relation(fields: [userId], references: [id])
+  userId      Int?
+  ipAddress   String
+  userAgent   String?
+  isBot       Int                @default(0)
+  referer     String?
+  countryCode String?
+  latitude    Float?
+  longitude   Float?
+  regionName  String?
+  cityName    String?
+  zipCode     String?
+  createdAt   DateTime
+
+  @@index([userId])
+  @@index([messageId])
+}
+
+model brickd_ChatMessage {
+  id                   Int                           @id @default(autoincrement())
+  uuid                 String                        @unique @default(uuid())
+  chat                 brickd_Chat                   @relation(fields: [chatId], references: [id])
+  chatId               Int
+  user                 brickd_User                   @relation(fields: [userId], references: [id])
+  userId               Int
+  message              String?                       @db.Text
+  set                  brickd_Set?                   @relation(fields: [setId], references: [id])
+  setId                Int?
+  buildEvent           brickd_BuildEvent?            @relation(fields: [eventId], references: [id])
+  eventId              Int?
+  createdAt            DateTime
+  chatReactions        brickd_ChatMessageReaction[]
+  urlClicks            brickd_ChatMessageUrlClicks[]
+  messageMedia         brickd_ChatMessageMedia[]
+  brickd_ReportContent brickd_ReportContent[]
+
+  @@index([setId])
+  @@index([userId])
+  @@index([chatId])
+  @@index([eventId])
+}
+
+model brickd_ChatMessageMedia {
+  id                Int                     @id @default(autoincrement())
+  uuid              String                  @unique @default(uuid())
+  message           brickd_ChatMessage      @relation(fields: [messageId], references: [id])
+  messageId         Int
+  user              brickd_User?            @relation(fields: [userId], references: [id])
+  userId            Int?
+  mediaType         CollectionItemMediaType
+  mediaSource       MediaSourceType         @default(CLOUDINARY)
+  mediaRawUrl       String
+  mediaKey          String
+  mediaAltKey       String?
+  mediaThumbnailKey String?
+  mediaUrl          String
+  createdAt         DateTime
+
+  @@index([userId])
+  @@index([messageId])
+}
+
+model brickd_ChatMessageReaction {
+  id        Int                @id @default(autoincrement())
+  uuid      String             @unique @default(uuid())
+  reaction  String
+  user      brickd_User        @relation(fields: [userId], references: [id])
+  userId    Int
+  message   brickd_ChatMessage @relation(fields: [messageId], references: [id])
+  messageId Int
+  createdAt DateTime
+
+  @@index([userId])
+  @@index([messageId])
+}
+
+model brickd_UserChat {
+  id        Int         @id @default(autoincrement())
+  uuid      String      @unique @default(uuid())
+  user      brickd_User @relation(fields: [userId], references: [id])
+  userId    Int
+  chat      brickd_Chat @relation(fields: [chatId], references: [id])
+  chatId    Int
+  isActive  Int         @default(1)
+  isCreator Int         @default(0)
+  updatedAt DateTime?
+  createdAt DateTime
+
+  @@index([userId])
+  @@index([chatId])
+  @@index([userId, isActive])
+}
+
+model brickd_UserStatus {
+  id         Int                @id @default(autoincrement())
+  uuid       String             @unique @default(uuid())
+  user       brickd_User        @relation(fields: [userId], references: [id])
+  userId     Int
+  status     AppStatus
+  device     brickd_UserDevice? @relation(fields: [deviceUuid], references: [deviceId])
+  deviceUuid String
+  updatedAt  DateTime
+  createdAt  DateTime
+
+  @@index([userId])
+  @@index([deviceUuid])
+}
+
+model brickd_SetReviewCreator {
+  id         Int                @id @default(autoincrement())
+  uuid       String             @unique @default(uuid())
+  user       brickd_User?       @relation(fields: [userId], references: [id])
+  userId     Int?
+  name       String
+  imageUrl   String
+  channelId  String?
+  country    brickd_Country?    @relation(fields: [countryId], references: [id])
+  countryId  Int?
+  createdAt  DateTime
+  setReviews brickd_SetReview[]
+
+  @@index([userId])
+  @@index([countryId])
+}
+
+model brickd_SetReviewClick {
+  id             Int              @id @default(autoincrement())
+  uuid           String           @default(uuid())
+  review         brickd_SetReview @relation(fields: [reviewId], references: [id])
+  reviewId       Int
+  ipAddress      String
+  isContentPress Int              @default(0)
+  userAgent      String?
+  isBot          Int              @default(0)
+  user           brickd_User?     @relation(fields: [userId], references: [id])
+  userId         Int?
+  countryCode    String?
+  latitude       Float?
+  longitude      Float?
+  regionName     String?
+  cityName       String?
+  zipCode        String?
+  createdAt      DateTime
+
+  @@index([reviewId])
+  @@index([userId])
+}
+
+model brickd_RebrickableAuthLog {
+  id        Int                 @id @default(autoincrement())
+  uuid      String              @unique @default(uuid())
+  user      brickd_User         @relation(fields: [userId], references: [id])
+  userId    Int
+  mode      RebrickableAuthType @default(USERPASS)
+  isError   Int                 @default(0)
+  response  String?             @db.Text()
+  createdAt DateTime
+
+  @@index([userId])
+}
+
+model brickd_UserCollectionDefault {
+  id           Int                   @id @default(autoincrement())
+  uuid         String                @unique @default(uuid())
+  user         brickd_User           @relation(fields: [userId], references: [id])
+  userId       Int
+  collection   brickd_UserCollection @relation(fields: [collectionId], references: [id])
+  collectionId Int
+  createdAt    DateTime
+
+  @@index([collectionId])
+  @@index([userId])
+}
+
+model brickd_DiscussionPoll {
+  id           Int                           @id @default(autoincrement())
+  uuid         String                        @unique @default(uuid())
+  duscussion   brickd_Discussion             @relation(fields: [discussionId], references: [id])
+  discussionId Int
+  title        String
+  isClosed     Int                           @default(0)
+  endDate      DateTime
+  createdAt    DateTime
+  pollOptions  brickd_DiscussionPollOption[]
+  pollVotes    brickd_DiscussionPollVote[]
+  authVote     brickd_DiscussionPollVote[]   @relation("authVote")
+
+  @@index([discussionId])
+  @@index([discussionId, endDate], name: "idx_poll_discussion_endDate")
+}
+
+model brickd_DiscussionPollOption {
+  id             Int                         @id @default(autoincrement())
+  uuid           String                      @unique @default(uuid())
+  poll           brickd_DiscussionPoll       @relation(fields: [pollId], references: [id])
+  pollId         Int
+  title          String
+  subTitle       String?
+  isWinner       Int                         @default(0)
+  createdAt      DateTime
+  pollVotes      brickd_DiscussionPollVote[]
+  authPollOption brickd_DiscussionPollVote[] @relation("authPollOption")
+
+  @@index([pollId])
+  @@index([pollId, createdAt], name: "idx_polloption_poll_createdAt")
+}
+
+model brickd_DiscussionPollVote {
+  id             Int                         @id @default(autoincrement())
+  uuid           String                      @unique @default(uuid())
+  pollOption     brickd_DiscussionPollOption @relation(fields: [optionId], references: [id])
+  authPollOption brickd_DiscussionPollOption @relation("authPollOption", fields: [optionId], references: [id], map: "authPollOption_fk")
+  optionId       Int
+  authPoll       brickd_DiscussionPoll       @relation("authVote", fields: [pollId], references: [id], map: "authVote_userActivity_fk")
+  poll           brickd_DiscussionPoll       @relation(fields: [pollId], references: [id])
+  pollId         Int
+  user           brickd_User                 @relation(fields: [userId], references: [id])
+  userId         Int
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime
+
+  @@index([optionId])
+  @@index([userId])
+  @@index([pollId])
+}
+
+model brickd_DiscussionView {
+  id                   Int                   @id @default(autoincrement())
+  uuid                 String                @unique @default(uuid())
+  discussionTimeSeries brickd_Discussion     @relation(name: "discussionViewsTimeSeries", fields: [discussionId], references: [id], map: "discussionViews_Last_30")
+  discussion           brickd_Discussion     @relation(name: "discussionViews", fields: [discussionId], references: [id], map: "discussionViews_All")
+  discussionId         Int
+  discussionSourceView DiscussionViewSource?
+  user                 brickd_User?          @relation(fields: [userId], references: [id])
+  userId               Int?
+  ipAddress            String?
+  userAgent            String?
+  isBot                Int                   @default(0)
+  createdAt            DateTime
+
+  @@index([userId])
+  @@index([discussionId])
+  @@index([discussionId, isBot, createdAt])
+}
+
+model brickd_DiscussionCategory {
+  id          Int                 @id @default(autoincrement())
+  uuid        String              @unique @default(uuid())
+  name        String
+  description String?
+  bgColor     String?
+  createdAt   DateTime
+  isShown     Int                 @default(1)
+  isAdmin     Int                 @default(0)
+  discussions brickd_Discussion[]
+}
+
+model brickd_DiscussionSet {
+  id           Int               @id @default(autoincrement())
+  uuid         String            @unique @default(uuid())
+  duscussion   brickd_Discussion @relation(fields: [discussionId], references: [id])
+  discussionId Int
+  set          brickd_Set        @relation(fields: [setId], references: [id])
+  setId        Int
+  createdAt    DateTime
+
+  @@index([setId])
+  @@index([discussionId])
+}
+
+model brickd_RestrictionLog {
+  id              Int             @id @default(autoincrement())
+  uuid            String          @unique @default(uuid())
+  userId          Int?
+  user            brickd_User?    @relation(fields: [userId], references: [id])
+  action          String?
+  userValue       Int
+  maxValue        Int
+  restrictionType RestrictionType @default(FOLLOW)
+  createdAt       DateTime
+
+  @@index([userId])
+}
+
+model brickd_TaskLogFunction {
+  id             Int                         @id @default(autoincrement())
+  uuid           String                      @unique @default(uuid()) @db.VarChar(50)
+  eventName      String                      @unique @db.VarChar(255)
+  processingType TaskrProcessingFunctionType @default(API)
+  createdAt      DateTime
+}
+
+model brickd_TaskLog {
+  id            Int           @id @default(autoincrement())
+  uuid          String        @unique @default(uuid()) @db.VarChar(50)
+  eventName     String        @db.VarChar(255)
+  status        QueueProgress @default(QUEUED)
+  logName       String?       @db.VarChar(255)
+  payload       String?
+  response      String?
+  messageId     String?       @db.VarChar(255)
+  requestId     String?       @db.VarChar(255)
+  error         String?       @db.VarChar(1000)
+  completedDate DateTime?
+  withoutTaskId Int           @default(0) @db.SmallInt
+  timeTaken     Decimal?      @db.Decimal(16, 2)
+  createdAt     DateTime
+  updatedAt     DateTime
+
+  @@index([eventName])
+  @@index([eventName, createdAt])
+  @@index([eventName, createdAt, status])
+}
+
+model brickd_DiscussionUrlClick {
+  id           Int                @id @default(autoincrement())
+  uuid         String             @unique @default(uuid())
+  type         UrlClickType       @default(DISCUSSION)
+  duscussion   brickd_Discussion? @relation(fields: [discussionId], references: [id], map: "authlike_userActivity_fk")
+  discussionId Int?
+  userId       Int?
+  user         brickd_User?       @relation(fields: [userId], references: [id])
+  ipAddress    String
+  userAgent    String?
+  isBot        Int                @default(0)
+  referer      String?
+  countryCode  String?
+  latitude     Float?
+  longitude    Float?
+  regionName   String?
+  cityName     String?
+  zipCode      String?
+  createdAt    DateTime
+
+  @@index([discussionId])
+  @@index([userId])
+}
+
+model brickd_DiscussionMedia {
+  id                Int                     @id @default(autoincrement())
+  uuid              String                  @unique @default(uuid())
+  discussion        brickd_Discussion       @relation(fields: [discussionId], references: [id])
+  discussionId      Int
+  position          Int                     @default(0)
+  user              brickd_User             @relation(fields: [userId], references: [id])
+  userId            Int
+  mediaType         CollectionItemMediaType
+  mediaSource       MediaSourceType         @default(CLOUDINARY)
+  mediaRawUrl       String
+  mediaKey          String
+  mediaAltKey       String?
+  mediaThumbnailKey String?
+  mediaUrl          String
+  createdAt         DateTime
+
+  @@index([userId])
+  @@index([discussionId])
+  @@index([discussionId, position, createdAt], name: "idx_discmedia_discussion_position_createdAt")
+}
+
+model brickd_DiscussionRepost {
+  id             Int                   @id @default(autoincrement())
+  uuid           String                @unique @default(uuid())
+  comment        String?               @db.VarChar(1000)
+  discussion     brickd_Discussion     @relation(name: "reposts", fields: [discussionId], references: [id])
+  authDiscussion brickd_Discussion     @relation("authRepost", fields: [discussionId], references: [id], map: "authRepost_userActivity_fk")
+  discussionId   Int
+  user           brickd_User           @relation(fields: [userId], references: [id])
+  userId         Int
+  createdAt      DateTime
+  userActivity   brickd_UserActivity[]
+
+  @@index([userId])
+  @@index([discussionId])
+}
+
+model brickd_DiscussionLike {
+  id             Int               @id @default(autoincrement())
+  uuid           String            @unique @default(uuid())
+  discussion     brickd_Discussion @relation(name: "likes", fields: [discussionId], references: [id])
+  authDiscussion brickd_Discussion @relation("authLikes", fields: [discussionId], references: [id], map: "authlike_userActivity_fk")
+  discussionId   Int
+  user           brickd_User       @relation(fields: [userId], references: [id])
+  userId         Int
+  createdAt      DateTime
+
+  @@index([userId])
+  @@index([discussionId])
+}
+
+model brickd_DiscussionMessageLike {
+  id          Int                      @id @default(autoincrement())
+  uuid        String                   @unique @default(uuid())
+  message     brickd_DiscussionMessage @relation(name: "likes", fields: [messageId], references: [id])
+  authMessage brickd_DiscussionMessage @relation("authLikes", fields: [messageId], references: [id], map: "authlike_userActivity_fk")
+  messageId   Int
+  user        brickd_User              @relation(fields: [userId], references: [id])
+  userId      Int
+  createdAt   DateTime
+
+  @@index([userId])
+  @@index([messageId])
+}
+
+model brickd_DiscussionRule {
+  id                   Int                          @id @default(autoincrement())
+  uuid                 String                       @unique @default(uuid())
+  ruleNumber           Int
+  title                String
+  body                 String                       @db.Text
+  updatedAt            DateTime
+  createdAt            DateTime
+  discussionStatusLogs brickd_DiscussionStatusLog[]
+}
+
+model brickd_DiscussionRuleAcceptance {
+  id        Int          @id @default(autoincrement())
+  uuid      String       @unique @default(uuid())
+  user      brickd_User? @relation(fields: [userId], references: [id])
+  userId    Int?
+  updatedAt DateTime?
+  createdAt DateTime
+
+  @@index([userId])
+}
+
+model brickd_DiscussionStatusLog {
+  id             Int                    @id @default(autoincrement())
+  uuid           String                 @unique @default(uuid())
+  user           brickd_User?           @relation(fields: [userId], references: [id])
+  actionType     DiscussionActionType   @default(USER)
+  statusType     DiscussionStatusType   @default(DELETE)
+  userId         Int?
+  discussion     brickd_Discussion      @relation(fields: [discussionId], references: [id])
+  discussionId   Int
+  discussionRule brickd_DiscussionRule? @relation(fields: [ruleId], references: [id])
+  ruleId         Int?
+  comments       String?
+  createdAt      DateTime
+
+  @@index([discussionId])
+  @@index([userId])
+  @@index([ruleId])
+}
+
+model brickd_FlaggedUsers {
+  id          Int           @id @default(autoincrement())
+  uuid        String        @unique @default(uuid())
+  user        brickd_User   @relation(fields: [userId], references: [id])
+  userId      Int
+  flaggedType FlaggedStatus @default(SPAM)
+  createdAt   DateTime
+
+  @@index([userId])
+}
+
+model brickd_UserSubscribe {
+  id            Int               @id @default(autoincrement())
+  uuid          String            @unique @default(uuid()) @db.VarChar(500)
+  subscribeType UserSubscribeType @default(ALL)
+  actorId       Int
+  user          brickd_User       @relation(fields: [userId], references: [id])
+  userId        Int
+  createdAt     DateTime
+  updatedAt     DateTime?
+
+  @@index([userId])
+}
+
+model brickd_LiveStream {
+  id              Int          @id @default(autoincrement())
+  uuid            String       @unique @default(uuid())
+  user            brickd_User? @relation(fields: [userId], references: [id])
+  userId          Int?
+  title           String
+  streamId        String
+  isLive          Int          @default(0)
+  streamKey       String?
+  streamUrl       String?
+  streamThumbnail String?
+  createdAt       DateTime
+  updatedAt       DateTime
+
+  @@index([userId])
+}
+
+model brickd_Discussion {
+  id                        Int                             @id @default(autoincrement())
+  uuid                      String                          @unique @default(uuid())
+  slug                      String
+  user                      brickd_User                     @relation(fields: [userId], references: [id])
+  userId                    Int
+  set                       brickd_Set?                     @relation(fields: [setId], references: [id])
+  setId                     Int?
+  discussionType            DiscussionPostType              @default(TEXT)
+  category                  brickd_DiscussionCategory?      @relation(fields: [categoryId], references: [id])
+  categoryId                Int?
+  imageUri                  String?
+  mediaAltKey               String?
+  link                      String?
+  needsAuth                 Int                             @default(0)
+  title                     String
+  shortTag                  String                          @unique
+  endDate                   DateTime?
+  isDeleted                 Int                             @default(0)
+  popularityScore           Decimal?                        @db.Decimal(16, 2)
+  message                   String?                         @db.Text
+  isLocked                  Int                             @default(0)
+  isSticky                  Int                             @default(0)
+  isFeatured                Int                             @default(0)
+  location                  brickd_Location?                @relation(fields: [locationId], references: [id])
+  locationId                Int?
+  isInstagram               Int                             @default(0) @db.SmallInt
+  isYouTube                 Int                             @default(0) @db.SmallInt
+  youTubeVideoId            String?                         @db.VarChar(100)
+  discussionCollection      brickd_UserCollection?          @relation(fields: [collectionId], references: [id])
+  collectionId              Int?
+  buildEvent                brickd_BuildEvent?              @relation(fields: [eventId], references: [id])
+  eventId                   Int?
+  isPublished               Int                             @default(1)
+  shareToActivity           Int                             @default(1)
+  scheduledAt               DateTime?
+  publishedAt               DateTime?
+  createdAt                 DateTime
+  updatedAt                 DateTime
+  discussionMessages        brickd_DiscussionMessage[]
+  discussionLike            brickd_DiscussionLike[]         @relation("likes")
+  authDiscussionLike        brickd_DiscussionLike[]         @relation("authLikes")
+  authDiscussionRepost      brickd_DiscussionRepost[]       @relation("authRepost")
+  discussionReposts         brickd_DiscussionRepost[]       @relation("reposts")
+  userActivities            brickd_UserActivity[]
+  discussionViews           brickd_DiscussionView[]         @relation("discussionViews")
+  discussionViewsTimeSeries brickd_DiscussionView[]         @relation("discussionViewsTimeSeries")
+  reportedContent           brickd_ReportContent[]
+  userNotifications         brickd_UserNotification[]
+  discussionUnsubscribers   brickd_DiscussionUnsubscriber[]
+  discussionMedia           brickd_DiscussionMedia[]
+  urlClicks                 brickd_DiscussionUrlClick[]
+  discussionSets            brickd_DiscussionSet[]
+  discussionPoll            brickd_DiscussionPoll[]
+  discussionStatusLog       brickd_DiscussionStatusLog[]
+  generalAudienceUser       brickd_GeneralAudienceUser[]
+  discussionFeatured        brickd_DiscussionFeatured[]
+
+  @@index([userId])
+  @@index([setId])
+  @@index([categoryId])
+  @@index([locationId])
+  @@index([collectionId])
+  @@index([isSticky, createdAt], name: "idx_discussion_sticky_createdat")
+  @@index([isSticky, isFeatured, createdAt])
+  @@index([isPublished, isDeleted, isSticky, isFeatured, createdAt])
+  @@index([isPublished, isDeleted, isSticky, isFeatured, popularityScore], name: "idx_disc_published_deleted_sticky_featured_popularity")
+  @@index([isSticky, isPublished, userId, createdAt], name: "idx_discussions_sticky_published_user_createdat")
+  @@index([eventId])
+}
+
+model brickd_DiscussionMessageReply {
+  id            Int                      @id @default(autoincrement())
+  uuid          String                   @unique @default(uuid())
+  parentMessage brickd_DiscussionMessage @relation("parentMessage", fields: [parentId], references: [id])
+  replyMessage  brickd_DiscussionMessage @relation("replyMessage", fields: [replyId], references: [id])
+  parentId      Int
+  replyId       Int
+  createdAt     DateTime
+
+  @@index([parentId])
+  @@index([replyId])
+}
+
+model brickd_UserCommentMedia {
+  id          Int                     @id @default(autoincrement())
+  uuid        String                  @unique @default(uuid())
+  comment     brickd_UserComment      @relation(fields: [commentId], references: [id])
+  commentId   Int
+  position    Int
+  mediaType   CollectionItemMediaType
+  mediaSource MediaSourceType         @default(CLOUDINARY)
+  mediaRawUrl String?
+  mediaKey    String?
+  mediaAltKey String?
+  mediaUrl    String
+  createdAt   DateTime
+
+  @@index([commentId])
+}
+
+model brickd_DiscussionMessageMedia {
+  id          Int                      @id @default(autoincrement())
+  uuid        String                   @unique @default(uuid())
+  messsage    brickd_DiscussionMessage @relation(fields: [messageId], references: [id])
+  messageId   Int
+  position    Int
+  mediaType   CollectionItemMediaType
+  mediaSource MediaSourceType          @default(CLOUDINARY)
+  mediaRawUrl String?
+  mediaKey    String?
+  mediaAltKey String?
+  mediaUrl    String
+  createdAt   DateTime
+
+  @@index([messageId])
+}
+
+model brickd_DiscussionMessage {
+  id                        Int                             @id @default(autoincrement())
+  uuid                      String                          @unique @default(uuid())
+  discussion                brickd_Discussion               @relation(fields: [discussionId], references: [id])
+  discussionId              Int
+  user                      brickd_User                     @relation(fields: [userId], references: [id])
+  userId                    Int
+  isReply                   Int                             @default(0)
+  message                   String                          @db.Text
+  createdAt                 DateTime
+  updatedAt                 DateTime
+  isDeleted                 Int                             @default(0)
+  discussionMessageLike     brickd_DiscussionMessageLike[]  @relation("likes")
+  authDiscussionMessageLike brickd_DiscussionMessageLike[]  @relation("authLikes")
+  parentMessages            brickd_DiscussionMessageReply[] @relation("parentMessage")
+  replyMessages             brickd_DiscussionMessageReply[] @relation("replyMessage")
+  reportedContent           brickd_ReportContent[]
+  uesrNotifications         brickd_UserNotification[]
+  discussionMessageMedia    brickd_DiscussionMessageMedia[]
+  userMentions              brickd_UserMention[]
+
+  @@index([userId])
+  @@index([discussionId])
+}
+
+model brickd_ShirtStreak {
+  id             Int         @id @default(autoincrement())
+  uuid           String      @unique @default(uuid())
+  user           brickd_User @relation(fields: [userId], references: [id])
+  userId         Int
+  size           String?
+  address        String?
+  trackingNumber String?
+  emailSentAt    DateTime?
+  updatedAt      DateTime?
+  createdAt      DateTime
+
+  @@index([userId])
+}
+
+model brickd_StreakReminderEmail {
+  id         Int         @id @default(autoincrement())
+  uuid       String      @unique @default(uuid())
+  user       brickd_User @relation(fields: [userId], references: [id])
+  userId     Int
+  totalCount Int
+  response   String
+  createdAt  DateTime
+
+  @@index([userId])
+}
+
+model brickd_SetReview {
+  id              Int                      @id @default(autoincrement())
+  uuid            String                   @unique @default(uuid())
+  setId           Int
+  set             brickd_Set               @relation(fields: [setId], references: [id])
+  contentType     ReviewType
+  thumbUrl        String?
+  contentUrl      String
+  title           String
+  position        Int                      @default(0)
+  subtitle        String?
+  creator         brickd_SetReviewCreator  @relation(fields: [creatorId], references: [id])
+  creatorId       Int
+  isActive        Int                      @default(1)
+  publishedAt     DateTime
+  updatedAt       DateTime
+  createdAt       DateTime
+  reviewClicks    brickd_SetReviewClick[]
+  reportedContent brickd_ReportContent[]
+  setReviewViewed brickd_SetReviewViewed[]
+
+  @@index([setId])
+  @@index([creatorId])
+}
+
+model brickd_CreatorRequest {
+  id           Int               @id @default(autoincrement())
+  uuid         String            @unique @default(uuid())
+  user         brickd_User       @relation(fields: [userId], references: [id])
+  userId       Int
+  website      String?
+  channelUrl   String?
+  instagramUrl String?
+  message      String?           @db.Text
+  contentType  ReviewType        @default(VIDEO)
+  status       ProposeEditStatus @default(PENDING)
+  isApproved   Int               @default(0)
+  isRejected   Int               @default(0)
+  updatedAt    DateTime
+  createdAt    DateTime
+
+  @@index([userId])
+}
+
+model brickd_IgnoreEbay {
+  id        Int        @id @default(autoincrement())
+  uuid      String     @unique @default(uuid())
+  set       brickd_Set @relation(fields: [setId], references: [id])
+  setId     Int        @unique
+  createdAt DateTime
+
+  @@index([setId])
+}
+
+model brickd_SetHighlight {
+  id             Int        @id @default(autoincrement())
+  uuid           String     @unique @default(uuid())
+  highlight      String
+  set            brickd_Set @relation(fields: [setId], references: [id])
+  setId          Int        @unique
+  totalMessages  Int        @default(0)
+  uniqueMessages Int        @default(0)
+  updatedAt      DateTime
+  createdAt      DateTime
+
+  @@index([setId])
+}
+
+model brickd_UserSpotifyPlaylist {
+  id          Int                   @id @default(autoincrement())
+  uuid        String                @unique @default(uuid())
+  user        brickd_User           @relation(fields: [userId], references: [id])
+  userId      Int
+  status      SpotifyPlaylistStatus @default(STARTED)
+  rawResponse String?
+  timeTaken   Decimal?              @db.Decimal(16, 2)
+  prompt      String?
+  mood        String?
+  genre       String?
+  model       String
+  error       String?
+  playlistId  String?
+  setId       Int
+  set         brickd_Set            @relation(fields: [setId], references: [id])
+  updatedAt   DateTime
+  createdAt   DateTime
+
+  @@index([userId])
+  @@index([setId])
+}
+
+model brickd_UserSpotify {
+  id              Int         @id @default(autoincrement())
+  uuid            String      @unique @default(uuid())
+  user            brickd_User @relation(fields: [userId], references: [id])
+  userId          Int         @unique
+  accessToken     String
+  refreshToken    String
+  expiresIn       Int
+  spotifyUserName String?
+  expiresAt       DateTime?
+  updatedAt       DateTime
+  createdAt       DateTime
+
+  @@index([userId])
+}
+
+enum RebrickableAuthType {
+  USERPASS
+  USERTOKEN
+}
+
+enum AppStatus {
+  ACTIVE
+  INACTIVE
+  BACKGROUND
+}
+
+enum ReviewType {
+  VIDEO
+  BLOG
+  INSTAGRAM
+}
+
+enum SetBuildStatus {
+  BUILT
+  BUILDING
+  NOTBUILT
+}
+
+enum ItemCondition {
+  SEALED
+  USED
+  OPENED
+  PARTEDOUT
+}
+
+enum SetBuildStatusForNotes {
+  BUILDING
+  COMPLETE
+}
+
+enum UserSubscribeType {
+  ADDLIST
+  ADDITEMNOTE
+  ADDMINIFIG
+  DISCUSSION
+  ALL
+}
+
+enum UserActivityType {
+  ITEMGROUP
+  ADDLIST
+  ADDMINIFIG
+  ADDMEDIA
+  ADDITEMNOTE
+  EVENTATTEND
+  EVENTPOST
+  EVENT
+  BUILT
+  NOTBUILT
+  COLLECTIONMEDIA
+  DISCUSSION
+  DISCUSSIONREPOST
+}
+
+enum UserRecommmendationPieceSize {
+  SMALL
+  MEDIUM
+  LARGE
+  ALL
+}
+
+enum IngestType {
+  THEMES
+  SETS
+  MINIFIGS
+  COLORS
+  INVENTORY
+  INVENTORYMINIFIGS
+}
+
+enum UrlClickType {
+  COLLECTION
+  LIGHTNINGKIT
+  PROMOTION
+  ACTIVITY
+  COLLECTIONITEM
+  COLLECTIONMINFIGITEM
+  BUILDNOTE
+  CHALLENGE
+  DISCUSSION
+}
+
+enum QueueProgress {
+  CREATED
+  QUEUED
+  JOBCOMPLETE
+  RUNNING
+  COMPLETE
+  ERROR
+}
+
+enum IngestProgress {
+  START
+  CSVDOWNLOAD
+  CSV
+  INSERTTEMP
+  DIFF
+  INSERTNEW
+  UPDATEPARTS
+  UPDATENAMES
+  UPDATETHEMES
+  INDEX
+  INDEXSTART
+  INDEXCOMPLETE
+  BRICKLINKMAPPING
+  COMPLETE
+  ERROR
+}
+
+enum CollectionItemMediaType {
+  IMAGE
+  VIDEO
+}
+
+enum MediaSourceType {
+  CLOUDINARY
+  S3
+}
+
+enum SetOfDayType {
+  SMALL
+  MEDIUM
+  LARGE
+}
+
+enum UserSocialType {
+  GOOGLE
+  APPLE
+  WEB
+  SPOTIFY
+}
+
+enum ReleaseNotePlatform {
+  IOS
+  ANDROID
+  ALL
+}
+
+enum MediaType {
+  ITEM
+  COLLECTION
+  MINIFIG
+}
+
+enum NotificationType {
+  FOLLOW
+  LIKE
+  COMMENT
+  COMMENTMEMBER
+  LIKECOMMENT
+  REPLYCOMMENT
+  MENTION
+  MENTIONCOMMENT
+  MENTIONDISCUSSIONCOMMENT
+  CHAT
+  EVENT
+  EVENTACTIVITY
+  EVENTMESSAGE
+  GENERAL
+  COLLAB
+  COLLECTIONLIKE
+  DISCUSSIONCOMMENT
+  DISCUSSIONLIKE
+  DISCUSSIONCOMMENTLIKE
+  DISCUSSIONREPLYCOMMENT
+  COMMUNITY
+  DISCUSSIONPOLL
+  SUBSCRIBEEVENT
+  DISCUSSIONREPOST
+  MOCUPDATE
+  MOCUPDATELIKE
+}
+
+enum SearchIndexType {
+  QUEUED
+  STARTED
+  PARSING
+  COMPLETED
+  ERROR
+}
+
+enum AudienceGeneralUserType {
+  CREATED
+  QUEUED
+  RUNNING
+  COMPLETE
+}
+
+enum LoopRequestType {
+  UPSERT
+  EVENT
+}
+
+enum ImportQueueType {
+  QUEUED
+  STARTED
+  COMPLETED
+  ERROR
+}
+
+enum SpotifyPlaylistStatus {
+  QUEUED
+  STARTED
+  TRACKS
+  PLAYLISTCOMPLETE
+  AICOMPLETE
+  ERROR
+}
+
+enum MediaDeletionQueueType {
+  QUEUED
+  STARTED
+  COMPLETED
+  ERROR
+}
+
+enum SignInRequestType {
+  STARTED
+  TOKEN
+  COMPLETE
+  ERROR
+}
+
+enum PushResult {
+  SUCCESS
+  ERROR
+}
+
+enum Platform {
+  APPLE
+  ANDROID
+}
+
+enum GoogleSignInError {
+  OAUTH
+  EMAIL
+  OTHER
+}
+
+enum ReportContentType {
+  COMMENT
+  PHOTO
+  SPAM
+  OTHER
+}
+
+enum ReportContentDecision {
+  APPROVED
+  REJECTED
+  IGNORED
+  PENDING
+}
+
+enum ChallengeTypes {
+  THEMES
+  PIECES
+  SETS
+  MINIFIGURE
+  FIRSTSET
+  SETSBUILT
+  SETORNOTE
+  BUILDNOTES
+  MEDIA
+}
+
+enum ChallengeListType {
+  THEME
+  SET
+}
+
+enum AppNoticeAction {
+  CLOSE
+  ACTION
+}
+
+enum AppNoticeAudience {
+  EVERYONE
+  APPVERSION
+  TARGETED
+  TARGETEDPLUS
+}
+
+enum AudienceTarget {
+  EMAIL
+  APP
+  APPNOTICE
+}
+
+enum AIFeedbackType {
+  THUMBSUP
+  THUMBSDOWN
+}
+
+enum AIStatusType {
+  STARTED
+  ERROR
+  EMPTYRESULTS
+  FINISHED
+}
+
+enum AppNoticeVersionRange {
+  GREATER
+  LESS
+}
+
+enum MarketplaceAvailability {
+  OUTOFSTOCK
+  INSTOCK
+  RETIRED
+  PREORDER
+  BACKORDERED
+  COMINGSOON
+}
+
+enum MarketplaceProductType {
+  NEW
+  USED
+  NEWUSED
+}
+
+enum YearInBricksEventType {
+  VIEWED
+  ACTION
+  SHARE
+  EMPTY
+}
+
+enum SupportTicketType {
+  BUG
+  FEEDBACK
+  OTHER
+}
+
+enum MarketplaceIgnoreReason {
+  NOTFOUND
+  OTHER
+}
+
+enum DeleteCollectionItemReason {
+  DELETECOLLECTION
+  WISHLIST
+  DELETEITEM
+}
+
+enum ReviewViewedType {
+  SETDETAIL
+  LANDING
+  EXPLORE
+}
+
+enum QRScanType {
+  QR
+  DOTMATRIX
+}
+
+enum SignUpSource {
+  APP
+  WEB
+}
+
+enum ImportRequestType {
+  REBRICKABLE
+  BRICKLINK
+  BRICKSET
+  LEGOBUILDER
+}
+
+enum BuilderSubscriptionDuration {
+  MON
+  YR
+}
+
+enum ExploreLists {
+  BUYINGGUIDE
+}
+
+enum BuilderTransactionEnvironment {
+  SANDBOX
+  PRODUCTION
+}
+
+enum LinkSource {
+  DISCUSSION
+  ACTIVITY
+  REVIEW
+  PROFILE
+  COLLECTIONITEM
+  BADGE
+  PROMOTION
+  YOUTUBE
+  INSTAGRAM
+}
+
+enum ProfileViewSource {
+  PROMOTED
+  RECOMMENDED
+  FEED
+  EXPLOREACTIVITY
+  QRSCAN
+  PLACES
+  BADGESLIST
+  CHAT
+  COLLECTION
+  SETDETAIL
+  USERLIST
+  ACTIVITY
+  DETAIL
+  LOCATION
+  COMMENT
+  LEADERBOARD
+  DISCUSSION
+  FOLLOWERLIST
+  LIKELIST
+  NOTIFICATION
+  BUILDEVENT
+  PROFILE
+}
+
+enum DiscussionViewSource {
+  HOME
+  DETAIL
+  FEED
+}
+
+enum EventViewSource {
+  HOME
+  DETAIL
+  FEED
+}
+
+enum ViewType {
+  ACTIVITY
+  COLLECTIONITEM
+  COLLECTIONMINIFIGITEM
+  COLLECTION
+  PROFILE
+  MINIFIG
+  RELEASELIST
+  EVENT
+}
+
+enum BuilderTransactionType {
+  PURCHASE
+  GIFTED
+  REFUND
+  SUBSCRIBED
+  UNSUBSCRIBED
+  CANCELLED
+  REMOVEDADMIN
+}
+
+enum BuilderSubscriptionType {
+  TRIAL
+  PAID
+  INIT
+}
+
+enum ImportRequestFailedReason {
+  SKIPPED
+  INVALID
+  UPDATED
+}
+
+enum MarketplaceRefreshSource {
+  SCRAPERAPI
+  LAMBDA
+  HTTP
+  API
+}
+
+enum DiscussionPostType {
+  TEXT
+  LINK
+  POLL
+  AMA
+}
+
+enum CloudinaryErrorType {
+  OTHER
+  COLLECTION
+  BUILDNOTE
+  CREATESET
+  AIIMAGE
+  CREATEDISCUSSION
+  CREATEDISCUSSIONCOMMENT
+  CREATEUSERCOMMENT
+  CREATECHATMESSAGE
+  EDITDISCUSSION
+  EDITAVATAR
+}
+
+enum DiscussionActionType {
+  ADMIN
+  USER
+}
+
+enum DiscussionStatusType {
+  DELETE
+  UNDELETE
+}
+
+enum RestrictionType {
+  FOLLOW
+  CREATEDISCUSSION
+  ITEMSCOUNT
+  COLLECTIONCOUNT
+  OTHER
+  CHAT
+  CHATMESSAGE
+  FLAGGED
+  VERIFICATION
+}
+
+enum CollectionType {
+  SETS
+  MINIFIG
+  LIST
+}
+
+enum MediaViewedSource {
+  FEED
+  GALLERY
+  COLLECTIONITEM
+  CAROSUEL
+  SETDETAIL
+  ACTIVITY
+}
+
+enum ProposeEditStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PromotionTargetingType {
+  ALL
+  REGION
+  COUNTRY
+  RADIUS
+}
+
+enum TaskrProcessingFunctionType {
+  API
+  LAMBDA
+}
+
+enum PromotedUserView {
+  FEED
+  EXPLORE
+  HOME
+  USERLIST
+}
+
+enum FlaggedStatus {
+  SPAM
+  VALIDATION
+}
+
+enum PromoWinnerStatus {
+  CREATED
+  EMAIL
+  DONE
+}
