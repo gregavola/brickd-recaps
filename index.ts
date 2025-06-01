@@ -4,7 +4,9 @@ import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import {
+  getAudienceCount,
   getAudienceForMonthlyRecaps,
+  getAudienceForMonthlyRecapsWithOffset,
   getAudienceForMonthlyRecapTest,
   getGlobalBuiltStats,
   getTopUserActivity,
@@ -20,8 +22,14 @@ import {
 } from "@prisma/client/sql";
 import prisma from "./db";
 import s3 from "./s3";
+import lambdaClient from "./lambda";
 import { ObjectCannedACL, PutObjectCommand } from "@aws-sdk/client-s3";
 import { debug } from "console";
+import {
+  InvokeCommand,
+  InvokeCommandInput,
+  InvokeCommandOutput,
+} from "@aws-sdk/client-lambda";
 
 export interface GlobalStats {
   totalPieces: number;
@@ -814,11 +822,70 @@ const getMonthlyStats = async ({
   };
 };
 
-export const processRecap = async ({ userId }: { userId?: number }) => {
+export const kickOffTasks = async () => {
   dayjs.extend(utc);
 
-  const startDate = dayjs.utc().startOf("month");
-  const endDate = dayjs.utc().endOf("month");
+  const startDate = dayjs.utc().subtract(1, "month").startOf("month");
+  const endDate = dayjs.utc().subtract(1, "month").endOf("month");
+
+  console.log(
+    `Starting for ${startDate.toISOString()} to ${endDate.toISOString()}`
+  );
+
+  const results = await prisma.$queryRawTyped(
+    getAudienceCount(startDate.toDate(), endDate.toDate())
+  );
+
+  console.log(`Total Users: ${results.length}`);
+
+  const totalPages = Math.ceil(results.length / 100);
+
+  const pagesArray: number[] = [];
+
+  for (let i = 0; i < totalPages; i++) {
+    pagesArray.push(i);
+  }
+
+  for await (const item of pagesArray) {
+    const offset = item * 100;
+    console.log(`Requested Offset: ${offset} - Page ${item}`);
+
+    try {
+      const payload = {
+        offset,
+        batch: true,
+      };
+
+      const input: InvokeCommandInput = {
+        FunctionName: "brickd-recaps",
+        InvocationType: "Event",
+        Payload: Buffer.from(JSON.stringify(payload), "utf8"),
+      };
+
+      const command = new InvokeCommand(input);
+
+      const res: InvokeCommandOutput = await lambdaClient.send(command);
+
+      console.log(`Lambda for ${offset} - ${JSON.stringify(payload)}`);
+      console.log(JSON.stringify(res));
+    } catch (err) {
+      console.log(`🔴 Error`);
+      console.error(err);
+    }
+  }
+};
+
+export const processRecap = async ({
+  userId,
+  offset,
+}: {
+  userId?: number;
+  offset?: number;
+}) => {
+  dayjs.extend(utc);
+
+  const startDate = dayjs.utc().subtract(1, "month").startOf("month");
+  const endDate = dayjs.utc().subtract(1, "month").endOf("month");
 
   console.log(
     `Starting for ${startDate.toISOString()} to ${endDate.toISOString()}`
@@ -828,7 +895,21 @@ export const processRecap = async ({ userId }: { userId?: number }) => {
     console.log(`== TEST RUN for ${userId}===`);
   }
 
-  const results = userId
+  if (offset) {
+    console.log(`== OFFSET RUN for ${offset}===`);
+  }
+
+  const results = offset
+    ? await prisma.$queryRawTyped(
+        getAudienceForMonthlyRecapsWithOffset(
+          startDate.toDate(),
+          endDate.toDate(),
+          startDate.toDate(),
+          offset,
+          100
+        )
+      )
+    : userId
     ? await prisma.$queryRawTyped(
         getAudienceForMonthlyRecapTest(
           startDate.toDate(),
@@ -943,5 +1024,31 @@ export const handler = async (event: any, context?: Context) => {
   console.log(`Event: ${JSON.stringify(event, null, 2)}`);
   console.log(`Context: ${JSON.stringify(context, null, 2)}`);
 
-  await processRecap(event.userId ? { userId: event.userId } : {});
+  const {
+    userId,
+    batch,
+    offset,
+    incremental,
+  }: {
+    userId?: number;
+    incremental?: boolean;
+    batch?: boolean;
+    offset?: number;
+  } = event;
+
+  console.log(`This is  batch: ${batch}`);
+
+  if (userId) {
+    console.log(`== SINGLE ${userId} ===`);
+    await processRecap({ userId: event.userId });
+  } else if (batch) {
+    console.log(`== BATCH ${offset} ===`);
+    await processRecap({ offset: offset || 0 });
+  } else if (incremental) {
+    console.log("== LEFT OFF ===");
+    await processRecap({});
+  } else {
+    console.log("== KICK OFF TASKS ===");
+    await kickOffTasks();
+  }
 };
