@@ -846,6 +846,8 @@ export const kickOffTasks = async () => {
     pagesArray.push(i);
   }
 
+  console.log(`=== Total Pages: ${pagesArray.length} ===`);
+
   for await (const item of pagesArray) {
     const offset = item * 100;
     console.log(`Requested Offset: ${offset} - Page ${item}`);
