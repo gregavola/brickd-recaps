@@ -23,13 +23,18 @@ import {
 import prisma from "./db";
 import s3 from "./s3";
 import lambdaClient from "./lambda";
-import { ObjectCannedACL, PutObjectCommand } from "@aws-sdk/client-s3";
+import {
+  GetObjectCommand,
+  ObjectCannedACL,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
 import { debug } from "console";
 import {
   InvokeCommand,
   InvokeCommandInput,
   InvokeCommandOutput,
 } from "@aws-sdk/client-lambda";
+import { LoopsClient } from "loops";
 
 export interface GlobalStats {
   totalPieces: number;
@@ -822,6 +827,26 @@ const getMonthlyStats = async ({
   };
 };
 
+export const sendLoopsEvent = async ({
+  userId,
+  eventName,
+  properties,
+}: {
+  userId: string;
+  eventName: string;
+  properties?: Record<string, string | number>;
+}) => {
+  const loops = new LoopsClient(process.env.LOOPS_API_KEY || "");
+
+  const data = await loops.sendEvent({
+    userId,
+    eventName,
+    eventProperties: properties,
+  });
+
+  return data;
+};
+
 export const kickOffTasks = async () => {
   dayjs.extend(utc);
 
@@ -873,6 +898,302 @@ export const kickOffTasks = async () => {
     } catch (err) {
       console.log(`🔴 Error`);
       console.error(err);
+    }
+  }
+};
+
+export const getUserRecapS3 = async ({
+  key,
+}: {
+  key: string;
+}): Promise<{
+  status: number;
+  data: any | null;
+  date: Date | string | null;
+}> => {
+  const fileName: string = key;
+
+  const getParams = {
+    Bucket: "brickd-user-recaps",
+    Key: fileName,
+  };
+
+  const response = await s3.send(new GetObjectCommand(getParams));
+
+  if (response && response.Body && response.LastModified) {
+    const str = await response.Body.transformToString();
+    return { status: 200, data: JSON.parse(str), date: response.LastModified };
+  } else {
+    return { status: 404, data: null, date: null };
+  }
+};
+
+export const sendEmails = async () => {
+  const startDate = dayjs.utc().subtract(1, "month").startOf("month");
+
+  const users = await prisma.brickd_UserRecap.findMany({
+    select: {
+      id: true,
+      uuid: true,
+      dataUrl: true,
+      reportDate: true,
+      user: {
+        select: {
+          userName: true,
+          uuid: true,
+        },
+      },
+    },
+    where: {
+      reportDate: startDate.toDate(),
+      status: "QUEUED",
+      user: {
+        enableCommunicationEmails: 1,
+      },
+      emailResponse: null,
+    },
+    orderBy: { userId: "asc" },
+  });
+
+  console.log(`Size: ${users.length}`);
+
+  for await (const user of users) {
+    console.log(`Starting with ${user.user?.userName || "Unknown"}`);
+
+    const now = performance.now();
+
+    try {
+      await prisma.brickd_UserRecap.update({
+        data: {
+          status: "RUNNING",
+          statusDate: new Date(),
+        },
+        where: {
+          uuid: user.uuid,
+        },
+      });
+
+      const recap = await getUserRecapS3({
+        key: user.dataUrl,
+      });
+
+      if (user.user && recap.data) {
+        const results = await sendLoopsEvent({
+          userId: user.user.uuid,
+          eventName: "monthly-recaps",
+          properties: {
+            totalSets: recap.data?.stories.sets.totalSetsAdded,
+            dateHeader: dayjs.utc(recap.data?.reportDate).format("MMMM YYYY"),
+            piecesBuilt: recap.data.stories.sets.totalPieceCount,
+            totalMinifigures: recap.data.stories.minifigs.totalMinifigsAdded,
+            setsBuilt: recap.data?.stories.sets.totalSetsBuilt,
+            recapUrl: `https://getbrickd.com/user-recaps/${user.uuid}`,
+          },
+        });
+
+        if (results) {
+          if (results.success) {
+            const end = performance.now();
+
+            await prisma.brickd_UserRecap.update({
+              data: {
+                status: "COMPLETE",
+                emailResponse: JSON.stringify(results),
+                emailTimeTaken: end - now,
+                emailSentAt: new Date(),
+              },
+              where: {
+                id: user.id,
+              },
+            });
+          } else {
+            await prisma.brickd_UserRecap.update({
+              data: {
+                status: "ERROR",
+                emailResponse: JSON.stringify(results),
+                emailSentAt: new Date(),
+              },
+              where: {
+                id: user.id,
+              },
+            });
+          }
+        } else {
+          await prisma.brickd_UserRecap.update({
+            data: {
+              status: "ERROR",
+              emailResponse: "Unknown Error (Empty Response)",
+              emailSentAt: new Date(),
+            },
+            where: {
+              id: user.id,
+            },
+          });
+        }
+      } else {
+        await prisma.brickd_UserRecap.update({
+          data: {
+            status: "ERROR",
+            emailResponse: "invaid user or recap.data",
+            statusDate: new Date(),
+          },
+          where: {
+            id: user.id,
+          },
+        });
+      }
+    } catch (err: any) {
+      console.log(err);
+
+      await prisma.brickd_UserRecap.update({
+        data: {
+          status: "ERROR",
+          emailResponse: err.message,
+          statusDate: new Date(),
+        },
+        where: {
+          id: user.id,
+        },
+      });
+    } finally {
+      const end = performance.now();
+      console.log(`Time: ${(end - now).toFixed(2)}ms`);
+      console.log(`Do with ${user.user?.userName || "Unknown"}`);
+    }
+  }
+};
+
+export const sendSingleEmail = async ({ userId }: { userId: number }) => {
+  const startDate = dayjs.utc().subtract(1, "month").startOf("month");
+
+  const users = await prisma.brickd_UserRecap.findMany({
+    select: {
+      id: true,
+      uuid: true,
+      dataUrl: true,
+      reportDate: true,
+      user: {
+        select: {
+          userName: true,
+          uuid: true,
+        },
+      },
+    },
+    where: {
+      reportDate: startDate.toDate(),
+      status: "QUEUED",
+      user: {
+        enableCommunicationEmails: 1,
+      },
+      emailResponse: null,
+      userId,
+    },
+  });
+
+  console.log(`Size: ${users.length}`);
+
+  for await (const user of users) {
+    console.log(`Starting with ${user.user?.userName || "Unknown"}`);
+
+    const now = performance.now();
+
+    try {
+      await prisma.brickd_UserRecap.update({
+        data: {
+          status: "RUNNING",
+          statusDate: new Date(),
+        },
+        where: {
+          uuid: user.uuid,
+        },
+      });
+
+      const recap = await getUserRecapS3({
+        key: user.dataUrl,
+      });
+
+      if (user.user && recap.data) {
+        const results = await sendLoopsEvent({
+          userId: user.user.uuid,
+          eventName: "monthly-recaps",
+          properties: {
+            totalSets: recap.data?.stories.sets.totalSetsAdded,
+            dateHeader: dayjs.utc(recap.data?.reportDate).format("MMMM YYYY"),
+            piecesBuilt: recap.data.stories.sets.totalPieceCount,
+            totalMinifigures: recap.data.stories.minifigs.totalMinifigsAdded,
+            setsBuilt: recap.data?.stories.sets.totalSetsBuilt,
+            recapUrl: `https://getbrickd.com/user-recaps/${user.uuid}`,
+          },
+        });
+
+        if (results) {
+          if (results.success) {
+            const end = performance.now();
+
+            await prisma.brickd_UserRecap.update({
+              data: {
+                status: "COMPLETE",
+                emailResponse: JSON.stringify(results),
+                emailTimeTaken: end - now,
+                emailSentAt: new Date(),
+              },
+              where: {
+                id: user.id,
+              },
+            });
+          } else {
+            await prisma.brickd_UserRecap.update({
+              data: {
+                status: "ERROR",
+                emailResponse: JSON.stringify(results),
+                emailSentAt: new Date(),
+              },
+              where: {
+                id: user.id,
+              },
+            });
+          }
+        } else {
+          await prisma.brickd_UserRecap.update({
+            data: {
+              status: "ERROR",
+              emailResponse: "Unknown Error (Empty Response)",
+              emailSentAt: new Date(),
+            },
+            where: {
+              id: user.id,
+            },
+          });
+        }
+      } else {
+        await prisma.brickd_UserRecap.update({
+          data: {
+            status: "ERROR",
+            emailResponse: "invaid user or recap.data",
+            statusDate: new Date(),
+          },
+          where: {
+            id: user.id,
+          },
+        });
+      }
+    } catch (err: any) {
+      console.log(err);
+
+      await prisma.brickd_UserRecap.update({
+        data: {
+          status: "ERROR",
+          emailResponse: err.message,
+          statusDate: new Date(),
+        },
+        where: {
+          id: user.id,
+        },
+      });
+    } finally {
+      const end = performance.now();
+      console.log(`Time: ${(end - now).toFixed(2)}ms`);
+      console.log(`Do with ${user.user?.userName || "Unknown"}`);
     }
   }
 };
@@ -1017,6 +1338,8 @@ export const processRecap = async ({
         },
       });
     }
+
+    await sendSingleEmail({ userId: user.id });
   }
 };
 
@@ -1030,11 +1353,13 @@ export const handler = async (event: any, context?: Context) => {
     userId,
     batch,
     offset,
+    emails,
     incremental,
   }: {
     userId?: number;
     incremental?: boolean;
     batch?: boolean;
+    emails?: boolean;
     offset?: number;
   } = event;
 
@@ -1049,6 +1374,9 @@ export const handler = async (event: any, context?: Context) => {
   } else if (incremental) {
     console.log("== LEFT OFF ===");
     await processRecap({});
+  } else if (emails) {
+    console.log("== Email ===");
+    await sendEmails();
   } else {
     console.log("== KICK OFF TASKS ===");
     await kickOffTasks();
