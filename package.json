@@ -7,7 +7,7 @@
     "build": "tsc",
     "build-remove-prisma": "rm -rf node_modules/@prisma/engines",
     "build-remove-primsa-debian": "rm -rf node_modules/.prisma/client/libquery_engine-debian-openssl-3.0.x.so.node",
-    "build-zip": "tsc & mv ./build/lambda.js . && mv ./build/index.js . && mv ./build/s3.js . && mv ./build/db.js . && zip -r bundle.zip index.js lambda.js s3.js db.js ./node_modules/** ./node_modules/.prisma"
+    "build-zip": "tsc && mv ./build/lambda.js . && mv ./build/index.js . && mv ./build/s3.js . && mv ./build/db.js . && zip -r bundle.zip index.js lambda.js s3.js db.js ./node_modules/** ./node_modules/.prisma"
   },
   "author": "",
   "license": "ISC",
