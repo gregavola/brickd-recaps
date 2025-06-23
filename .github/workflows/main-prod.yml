@@ -7,17 +7,53 @@ jobs:
   deploy_source:
     name: build and deploy lambda
     runs-on: ubuntu-latest
+
+    env:
+      GH_TOKEN: ${{ secrets.GH_TOKEN }} # ⬅️ provide token to npm
+
     steps:
       - uses: actions/checkout@v4
       - name: Use Node.js 20.x
         uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Install dependencies, Build application and Zip dist folder contents
-        run: npm install && npx prisma generate --sql && tsc && npm run build-remove-prisma && npm run build-remove-primsa-debian && npm run build-zip
+
+      - name: Setup .npmrc for GitHub Packages
+        run: |
+          echo "@brickdapp:registry=https://npm.pkg.github.com/" > ~/.npmrc
+          echo "//npm.pkg.github.com/:_authToken=${GH_TOKEN}" >> ~/.npmrc
+      - name: Install dependencies
+        run: npm install
+
+      - name: Merge shared schema with local generators
+        run: |
+          awk '
+            BEGIN { skip=0 }
+            /^generator client {/,/^}/ {
+              if (/^generator client {/) { skip=1 }
+              if (skip && /^}/) { skip=0; next }
+              if (skip) { next }
+            }
+            { print }
+          ' node_modules/@brickdapp/prisma-schema/prisma/schema.prisma > prisma/merged.prisma
+
+          cat prisma/platform-generator.prisma >> prisma/merged.prisma
+
+      - name: Print merged Prisma schema (For Debug)
+        run: cat prisma/merged.prisma
+
+      - name: Generate Prisma client and typed SQL
+        run: npx prisma generate --schema=prisma/merged.prisma --sql
         env:
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           DATABASE_URL: ${{ secrets.DIRECT_URL }}
+
+      - name: Build (Remove Prisma + Debian Libraies)
+        run: |
+          tsc
+          npm run build-remove-prisma
+          npm run build-remove-primsa-debian
+
       - name: deploy zip to s3
         uses: hkusu/s3-upload-action@v2
         with:
@@ -28,6 +64,7 @@ jobs:
           aws-bucket: "brickd-tasker-zip"
           destination-dir: "/"
           file-path: "./bundle.zip"
+
       - name: deploy s3 zip to aws lambda
         uses: appleboy/lambda-action@v0.2.0
         with:

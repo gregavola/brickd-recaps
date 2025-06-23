@@ -16,3 +16,4 @@ bundle/index.js
 test.html
 cookies.json
 .DS_Store
+.npmrc

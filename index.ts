@@ -1371,7 +1371,7 @@ export const handler = async (event: any, context?: Context) => {
     offset?: number;
   } = event;
 
-  console.log(`This is  batch: ${batch}`);
+  console.log(`This is batch: ${batch}`);
 
   if (userId) {
     console.log(`== SINGLE ${userId} ===`);
