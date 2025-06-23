@@ -53,6 +53,7 @@ jobs:
           tsc
           npm run build-remove-prisma
           npm run build-remove-primsa-debian
+          npm run build-zip
 
       - name: deploy zip to s3
         uses: hkusu/s3-upload-action@v2
