@@ -1,14 +1,15 @@
 {
   "name": "brickd-recaps",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "",
   "main": "index.js",
   "scripts": {
     "build": "tsc",
-    "prisma:generate:typed-sql": "awk 'BEGIN { skip=0 } /^generator client {/,/^}/ { if (/^generator client {/) { skip=1 } if (skip && /^}/) { skip=0; next } if (skip) { next } } { print }' node_modules/@brickdapp/prisma-schema/prisma/schema.prisma > prisma/merged.prisma && cat prisma/platform-generator.prisma >> prisma/merged.prisma && npx prisma generate --schema=prisma/merged.prisma --sql && rm prisma/merged.prisma",
+    "prisma:generate": "awk 'BEGIN { skip=0 } /^generator client {/,/^}/ { if (/^generator client {/) { skip=1 } if (skip && /^}/) { skip=0; next } if (skip) { next } } { print }' node_modules/@brickdapp/prisma-schema/prisma/schema.prisma > prisma/merged.prisma && cat prisma/platform-generator.prisma >> prisma/merged.prisma && npx prisma generate --schema=prisma/merged.prisma --sql && rm prisma/merged.prisma",
     "build-remove-prisma": "rm -rf node_modules/@prisma/engines",
     "build-remove-primsa-debian": "rm -rf node_modules/.prisma/client/libquery_engine-debian-openssl-3.0.x.so.node",
-    "build-zip": "tsc && mv ./build/lambda.js . && mv ./build/index.js . && mv ./build/s3.js . && mv ./build/db.js . && zip -r bundle.zip index.js lambda.js s3.js db.js ./node_modules/** ./node_modules/.prisma"
+    "build-zip": "tsc && mv ./build/lambda.js . && mv ./build/index.js . && mv ./build/s3.js . && mv ./build/db.js . && zip -r bundle.zip index.js lambda.js s3.js db.js ./node_modules/** ./node_modules/.prisma",
+    "update-schema": "npm update  @brickdapp/prisma-schema --registry=https://npm.pkg.github.com && npm run prisma:generate"
   },
   "author": "",
   "license": "ISC",
@@ -30,7 +31,6 @@
     "@aws-sdk/client-sqs": "^3.645.0",
     "@aws-sdk/util-utf8-node": "^3.259.0",
     "@prisma/client": "5.22.0",
-    "cheerio": "^1.0.0",
     "dayjs": "^1.11.13",
     "loops": "^3.3.0",
     "luxon": "^3.6.1",

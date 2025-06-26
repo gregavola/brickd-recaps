@@ -32,7 +32,7 @@ SELECT
 FROM
     audience a
     LEFT JOIN "brickd"."brickd_UserRecap" ur ON ur."userId" = a.id
-    AND ur."reportDate" = $3
+    AND ur."reportId" = $3
 WHERE
     (
         a."totalMinifigs" >= 2

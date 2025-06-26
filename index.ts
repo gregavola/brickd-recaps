@@ -847,15 +847,33 @@ export const sendLoopsEvent = async ({
   return data;
 };
 
-export const kickOffTasks = async () => {
+export const kickOffTasks = async ({ reportId }: { reportId: number }) => {
   dayjs.extend(utc);
 
-  const startDate = dayjs.utc().subtract(1, "month").startOf("month");
-  const endDate = dayjs.utc().subtract(1, "month").endOf("month");
+  const data = await prisma.brickd_UserRecapReport.findFirst({
+    where: { id: reportId },
+  });
+
+  if (!data) {
+    throw new Error(`Invalid Report found for ${reportId}`);
+  }
+
+  const startDate = dayjs.utc(data.reportDate);
+  const endDate = dayjs.utc(data.reportDate).endOf("month");
 
   console.log(
     `Starting for ${startDate.toISOString()} to ${endDate.toISOString()}`
   );
+
+  await prisma.brickd_UserRecapReport.update({
+    data: {
+      startTime: new Date(),
+      status: "RUNNING",
+    },
+    where: {
+      id: reportId,
+    },
+  });
 
   const results = await prisma.$queryRawTyped(
     getAudienceCount(startDate.toDate(), endDate.toDate())
@@ -875,11 +893,24 @@ export const kickOffTasks = async () => {
 
   for await (const item of pagesArray) {
     const offset = item * 100;
+    const data = await prisma.brickd_UserRecapReportLog.create({
+      data: {
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        startTime: new Date(),
+        status: "QUEUED",
+        offset,
+        reportId,
+      },
+    });
+
     console.log(`Requested Offset: ${offset} - Page ${item}`);
 
     try {
       const payload = {
         offset,
+        reportId,
+        logId: data.id,
         batch: true,
       };
 
@@ -900,6 +931,16 @@ export const kickOffTasks = async () => {
       console.error(err);
     }
   }
+
+  await prisma.brickd_UserRecapReport.update({
+    data: {
+      endTime: new Date(),
+      status: "COMPLETE",
+    },
+    where: {
+      id: reportId,
+    },
+  });
 };
 
 export const getUserRecapS3 = async ({
@@ -928,8 +969,14 @@ export const getUserRecapS3 = async ({
   }
 };
 
-export const sendEmails = async () => {
-  const startDate = dayjs.utc().subtract(1, "month").startOf("month");
+export const sendEmails = async ({ reportId }: { reportId: number }) => {
+  const data = await prisma.brickd_UserRecapReport.findFirst({
+    where: { id: reportId },
+  });
+
+  if (!data) {
+    throw new Error(`Invalid Report found for ${reportId}`);
+  }
 
   const users = await prisma.brickd_UserRecap.findMany({
     select: {
@@ -945,7 +992,7 @@ export const sendEmails = async () => {
       },
     },
     where: {
-      reportDate: startDate.toDate(),
+      reportId,
       status: "QUEUED",
       user: {
         enableCommunicationEmails: 1,
@@ -1201,17 +1248,58 @@ export const sendSingleEmail = async ({
   }
 };
 
+export const createRecapReport = async ({
+  reportDate,
+}: {
+  reportDate: Date | string;
+}) => {
+  await prisma.brickd_UserRecapReport.create({
+    data: {
+      createdAt: new Date(),
+      reportDate,
+      status: "QUEUED",
+    },
+  });
+};
+
+export const getMostRecentRecapReport = async () => {
+  const data = await prisma.brickd_UserRecapReport.findFirst({
+    orderBy: {
+      createdAt: "desc",
+    },
+    take: 1,
+  });
+
+  return data.id;
+};
+
 export const processRecap = async ({
   userId,
   offset,
+  logId,
+  sendEmail,
+  reportId,
 }: {
   userId?: number;
   offset?: number;
+  logId: number | null;
+  sendEmail?: boolean;
+  reportId: number;
 }) => {
+  const data = await prisma.brickd_UserRecapReport.findFirst({
+    where: { id: reportId },
+  });
+
+  if (!data) {
+    throw new Error(`Invalid Report found for ${reportId}`);
+  }
+
+  const { reportDate } = data;
+
   dayjs.extend(utc);
 
-  const startDate = dayjs.utc().subtract(1, "month").startOf("month");
-  const endDate = dayjs.utc().subtract(1, "month").endOf("month");
+  const startDate = dayjs.utc(reportDate);
+  const endDate = dayjs.utc(reportDate).endOf("month");
 
   console.log(
     `Starting for ${startDate.toISOString()} to ${endDate.toISOString()}`
@@ -1230,7 +1318,7 @@ export const processRecap = async ({
         getAudienceForMonthlyRecapsWithOffset(
           startDate.toDate(),
           endDate.toDate(),
-          startDate.toDate(),
+          reportId,
           offset,
           100
         )
@@ -1240,7 +1328,7 @@ export const processRecap = async ({
         getAudienceForMonthlyRecapTest(
           startDate.toDate(),
           endDate.toDate(),
-          startDate.toDate(),
+          reportId,
           userId
         )
       )
@@ -1248,7 +1336,7 @@ export const processRecap = async ({
         getAudienceForMonthlyRecaps(
           startDate.toDate(),
           endDate.toDate(),
-          startDate.toDate()
+          reportId
         )
       );
 
@@ -1347,7 +1435,22 @@ export const processRecap = async ({
       });
     }
 
-    await sendSingleEmail({ userId: user.id, recapId });
+    if (sendEmail) {
+      await sendSingleEmail({ userId: user.id, recapId });
+    }
+
+    if (logId) {
+      await prisma.brickd_UserRecapReportLog.update({
+        data: {
+          updatedAt: new Date(),
+          endTime: new Date(),
+          status: "JOBCOMPLETE",
+        },
+        where: {
+          id: logId,
+        },
+      });
+    }
   }
 };
 
@@ -1362,31 +1465,62 @@ export const handler = async (event: any, context?: Context) => {
     batch,
     offset,
     emails,
+    logId,
+    reportDate,
     incremental,
+    reportId,
   }: {
     userId?: number;
     incremental?: boolean;
     batch?: boolean;
     emails?: boolean;
     offset?: number;
+    reportDate?: string;
+    reportId?: number;
+    logId?: number;
   } = event;
 
   console.log(`This is batch: ${batch}`);
 
-  if (userId) {
+  if (reportDate) {
+    await createRecapReport({ reportDate });
+  } else if (userId) {
     console.log(`== SINGLE ${userId} ===`);
-    await processRecap({ userId: event.userId });
+
+    const reportId = await getMostRecentRecapReport();
+
+    if (!reportId) {
+      throw new Error("Unable to find Report ID");
+    }
+
+    await processRecap({ userId: event.userId, reportId, logId: null });
   } else if (batch) {
+    if (!logId || !reportId) {
+      throw new Error("Missing LogId / ReportId");
+    }
+
     console.log(`== BATCH ${offset} ===`);
-    await processRecap({ offset: offset || 0 });
+    await processRecap({ offset: offset || 0, logId, reportId });
   } else if (incremental) {
+    if (!reportId) {
+      throw new Error("Missing ReportId");
+    }
+
     console.log("== LEFT OFF ===");
-    await processRecap({});
+    await processRecap({ reportId, logId: null });
   } else if (emails) {
+    if (!reportId) {
+      throw new Error("Missing ReportId");
+    }
+
     console.log("== Email ===");
-    await sendEmails();
+    await sendEmails({ reportId });
   } else {
-    console.log("== KICK OFF TASKS ===");
-    await kickOffTasks();
+    if (!reportId) {
+      console.error(`Missing Report ID`);
+    } else {
+      console.log("== KICK OFF TASKS ===");
+      await kickOffTasks({ reportId });
+    }
   }
 };

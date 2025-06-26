@@ -1,3 +1,7 @@
+# 1.0.2
+
+- More automated system
+
 # 1.0.1
 
 - Adding package fix to generate local prisma schema for generator and lambda
