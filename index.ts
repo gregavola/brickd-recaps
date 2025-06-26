@@ -978,6 +978,16 @@ export const sendEmails = async ({ reportId }: { reportId: number }) => {
     throw new Error(`Invalid Report found for ${reportId}`);
   }
 
+  await prisma.brickd_UserRecapReport.update({
+    data: {
+      status: "RUNNING",
+      updatedAt: new Date(),
+    },
+    where: {
+      id: reportId,
+    },
+  });
+
   const users = await prisma.brickd_UserRecap.findMany({
     select: {
       id: true,
@@ -1108,6 +1118,16 @@ export const sendEmails = async ({ reportId }: { reportId: number }) => {
       console.log(`Do with ${user.user?.userName || "Unknown"}`);
     }
   }
+
+  await prisma.brickd_UserRecapReport.update({
+    data: {
+      status: "JOBCOMPLETE",
+      updatedAt: new Date(),
+    },
+    where: {
+      id: reportId,
+    },
+  });
 };
 
 export const sendSingleEmail = async ({
@@ -1448,6 +1468,26 @@ export const processRecap = async ({
         },
         where: {
           id: logId,
+        },
+      });
+    }
+
+    const count = await prisma.brickd_UserRecapReportLog.count({
+      where: {
+        reportId,
+        status: { not: "JOBCOMPLETE" },
+      },
+    });
+
+    if (count === 0) {
+      await prisma.brickd_UserRecapReport.update({
+        data: {
+          status: "COMPLETE",
+          endTime: new Date(),
+          updatedAt: new Date(),
+        },
+        where: {
+          id: reportId,
         },
       });
     }
