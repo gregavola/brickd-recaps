@@ -858,7 +858,7 @@ export const kickOffTasks = async ({ reportId }: { reportId: number }) => {
     throw new Error(`Invalid Report found for ${reportId}`);
   }
 
-  const startDate = dayjs.utc(data.reportDate);
+  const startDate = dayjs.utc(data.reportDate).startOf("month");
   const endDate = dayjs.utc(data.reportDate).endOf("month");
 
   console.log(
@@ -1316,9 +1316,13 @@ export const processRecap = async ({
 
   const { reportDate } = data;
 
+  console.log(`
+    Report Date: ${reportDate.toISOString()}
+    `);
+
   dayjs.extend(utc);
 
-  const startDate = dayjs.utc(reportDate);
+  const startDate = dayjs.utc(reportDate).startOf("month");
   const endDate = dayjs.utc(reportDate).endOf("month");
 
   console.log(
@@ -1432,6 +1436,7 @@ export const processRecap = async ({
         data: {
           userId: user.id,
           reportDate: startDate.toDate(),
+          reportId,
           timeTaken: parseFloat(timeDiff),
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -1470,26 +1475,26 @@ export const processRecap = async ({
           id: logId,
         },
       });
-    }
 
-    const count = await prisma.brickd_UserRecapReportLog.count({
-      where: {
-        reportId,
-        status: { not: "JOBCOMPLETE" },
-      },
-    });
-
-    if (count === 0) {
-      await prisma.brickd_UserRecapReport.update({
-        data: {
-          status: "COMPLETE",
-          endTime: new Date(),
-          updatedAt: new Date(),
-        },
+      const count = await prisma.brickd_UserRecapReportLog.count({
         where: {
-          id: reportId,
+          reportId,
+          status: { not: "JOBCOMPLETE" },
         },
       });
+
+      if (count === 0) {
+        await prisma.brickd_UserRecapReport.update({
+          data: {
+            status: "COMPLETE",
+            endTime: new Date(),
+            updatedAt: new Date(),
+          },
+          where: {
+            id: reportId,
+          },
+        });
+      }
     }
   }
 };
