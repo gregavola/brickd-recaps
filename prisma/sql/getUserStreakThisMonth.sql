@@ -1,61 +1,84 @@
 WITH
     combined_activity AS (
         SELECT
-            "userId" AS user_id,
-            DATE_TRUNC('day', "createdAt" - INTERVAL '12 hours') AS activity_date_group
+            ua."userId" AS user_id,
+            date_trunc(
+                'day',
+                ua."createdAt" AT TIME ZONE COALESCE(u."timeZone", 'UTC')
+            ) AS activity_date_group
         FROM
-            "brickd"."brickd_UserActivity"
+            "brickd"."brickd_UserActivity" ua
+            JOIN "brickd"."brickd_User" u ON u.id = ua."userId"
         WHERE
-            "userId" = $1 -- Replace with the specific user ID
-            AND "createdAt" BETWEEN $2 AND $3 -- Replace with the date range
+            ua."userId" = $1 -- user ID
+            AND ua."createdAt" BETWEEN $2 AND $3 -- date range
         UNION ALL
         SELECT
-            "userId" AS user_id,
-            DATE_TRUNC('day', "createdAt" - INTERVAL '12 hours') AS activity_date_group
+            dm."userId" AS user_id,
+            date_trunc(
+                'day',
+                dm."createdAt" AT TIME ZONE COALESCE(u."timeZone", 'UTC')
+            ) AS activity_date_group
         FROM
-            "brickd"."brickd_DiscussionMessage"
+            "brickd"."brickd_DiscussionMessage" dm
+            JOIN "brickd"."brickd_User" u ON u.id = dm."userId"
         WHERE
-            "userId" = $1 -- Replace with the specific user ID
-            AND "createdAt" BETWEEN $2 AND $3 -- Replace with the date range
+            dm."userId" = $1
+            AND dm."createdAt" BETWEEN $2 AND $3
         UNION ALL
         SELECT
-            "userId" AS user_id,
-            DATE_TRUNC('day', "createdAt" - INTERVAL '12 hours') AS activity_date_group
+            dl."userId" AS user_id,
+            date_trunc(
+                'day',
+                dl."createdAt" AT TIME ZONE COALESCE(u."timeZone", 'UTC')
+            ) AS activity_date_group
         FROM
-            "brickd"."brickd_DiscussionLike"
+            "brickd"."brickd_DiscussionLike" dl
+            JOIN "brickd"."brickd_User" u ON u.id = dl."userId"
         WHERE
-            "userId" = $1 -- Replace with the specific user ID
-            AND "createdAt" BETWEEN $2 AND $3 -- Replace with the date range
+            dl."userId" = $1
+            AND dl."createdAt" BETWEEN $2 AND $3
         UNION ALL
         SELECT
-            "userId" AS user_id,
-            DATE_TRUNC('day', "createdAt" - INTERVAL '12 hours') AS activity_date_group
+            cl."userId" AS user_id,
+            date_trunc(
+                'day',
+                cl."createdAt" AT TIME ZONE COALESCE(u."timeZone", 'UTC')
+            ) AS activity_date_group
         FROM
-            "brickd"."brickd_UserCommentLikes"
+            "brickd"."brickd_UserCommentLikes" cl
+            JOIN "brickd"."brickd_User" u ON u.id = cl."userId"
         WHERE
-            "userId" = $1 -- Replace with the specific user ID
-            AND "createdAt" BETWEEN $2 AND $3 -- Replace with the date range
+            cl."userId" = $1
+            AND cl."createdAt" BETWEEN $2 AND $3
         UNION ALL
         SELECT
-            "userId" AS user_id,
-            DATE_TRUNC('day', "createdAt" - INTERVAL '12 hours') AS activity_date_group
+            c."userId" AS user_id,
+            date_trunc(
+                'day',
+                c."createdAt" AT TIME ZONE COALESCE(u."timeZone", 'UTC')
+            ) AS activity_date_group
         FROM
-            "brickd"."brickd_UserComment"
+            "brickd"."brickd_UserComment" c
+            JOIN "brickd"."brickd_User" u ON u.id = c."userId"
         WHERE
-            "userId" = $1 -- Replace with the specific user ID
-            AND "createdAt" BETWEEN $2 AND $3 -- Replace with the date range
+            c."userId" = $1
+            AND c."createdAt" BETWEEN $2 AND $3
         UNION ALL
         SELECT
-            "userId" AS user_id,
-            DATE_TRUNC('day', "createdAt" - INTERVAL '12 hours') AS activity_date_group
+            l."userId" AS user_id,
+            date_trunc(
+                'day',
+                l."createdAt" AT TIME ZONE COALESCE(u."timeZone", 'UTC')
+            ) AS activity_date_group
         FROM
-            "brickd"."brickd_UserLike"
+            "brickd"."brickd_UserLike" l
+            JOIN "brickd"."brickd_User" u ON u.id = l."userId"
         WHERE
-            "userId" = $1 -- Replace with the specific user ID
-            AND "createdAt" BETWEEN $2 AND $3 -- Replace with the date range
+            l."userId" = $1
+            AND l."createdAt" BETWEEN $2 AND $3
     ),
     user_activity AS (
-        -- Group by unique day per user
         SELECT DISTINCT
             user_id,
             activity_date_group
@@ -66,7 +89,6 @@ WITH
         SELECT
             user_id,
             activity_date_group,
-            -- Generate streak grouping by checking for gaps > 24 hours
             SUM(
                 CASE
                     WHEN previous_activity_date_group IS NULL
@@ -84,7 +106,6 @@ WITH
                 SELECT
                     user_id,
                     activity_date_group,
-                    -- Get the previous activity date to check for gaps
                     LAG(activity_date_group) OVER (
                         PARTITION BY
                             user_id
@@ -93,7 +114,7 @@ WITH
                     ) AS previous_activity_date_group
                 FROM
                     user_activity
-            ) subquery
+            ) sub
     ),
     streak_lengths AS (
         SELECT
@@ -118,5 +139,3 @@ ORDER BY
     streak_length DESC
 LIMIT
     1;
-
--- Only return the longest streak

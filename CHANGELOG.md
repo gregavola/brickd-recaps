@@ -1,6 +1,7 @@
 # 1.0.2
 
 - More automated system
+- Fixing streaks and adding in tests
 
 # 1.0.1
 
