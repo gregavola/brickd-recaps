@@ -150,7 +150,7 @@ const getUserRecaps = async ({
     },
   });
 
-  console.log(`brickd_User.findFirst: ${new Date().toISOString()}`);
+  //console.log(`brickd_User.findFirst: ${new Date().toISOString()}`);
 
   if (!user) {
     throw new Error("Invalid User");
@@ -185,9 +185,9 @@ const getUserRecaps = async ({
     },
   });
 
-  console.log(
+  /*console.log(
     `brickd_UserCollectionItem.findMany: ${new Date().toISOString()}`
-  );
+  );*/
 
   // Total Sets Added
   const totalCollectionsCreated = await prisma.brickd_UserCollection.count({
@@ -201,7 +201,7 @@ const getUserRecaps = async ({
     },
   });
 
-  console.log(`brickd_UserCollection.count: ${new Date().toISOString()}`);
+  // console.log(`brickd_UserCollection.count: ${new Date().toISOString()}`);
 
   const totalCollectionTypes = await prisma.brickd_UserCollection.groupBy({
     by: "collectionType",
@@ -218,7 +218,7 @@ const getUserRecaps = async ({
     },
   });
 
-  console.log(`brickd_UserCollection.groupBy: ${new Date().toISOString()}`);
+  // console.log(`brickd_UserCollection.groupBy: ${new Date().toISOString()}`);
 
   // Minifigs
 
@@ -229,9 +229,9 @@ const getUserRecaps = async ({
       },
     });
 
-  console.log(
-    `brickd_UserCollectionMinifigItem.count: ${new Date().toISOString()}`
-  );
+  // console.log(
+  //   `brickd_UserCollectionMinifigItem.count: ${new Date().toISOString()}`
+  // );
 
   const totalMinifigsAdded =
     await prisma.brickd_UserCollectionMinifigItem.count({
@@ -249,9 +249,9 @@ const getUserRecaps = async ({
       },
     });
 
-  console.log(
-    `brickd_UserCollectionMinifigItem.count (total): ${new Date().toISOString()}`
-  );
+  // console.log(
+  //   `brickd_UserCollectionMinifigItem.count (total): ${new Date().toISOString()}`
+  // );
 
   // Total Sets Added
   const totalSetsAdded = await prisma.brickd_UserCollectionItem.count({
@@ -269,9 +269,9 @@ const getUserRecaps = async ({
     },
   });
 
-  console.log(
-    `brickd_UserCollectionItem.count (added): ${new Date().toISOString()}`
-  );
+  // console.log(
+  //   `brickd_UserCollectionItem.count (added): ${new Date().toISOString()}`
+  // );
 
   // Total Sets Built
   const totalSetsBuilt = await prisma.brickd_UserCollectionItem.count({
@@ -290,15 +290,15 @@ const getUserRecaps = async ({
     },
   });
 
-  console.log(
-    `brickd_UserCollectionItem.count (built): ${new Date().toISOString()}`
-  );
+  // console.log(
+  //   `brickd_UserCollectionItem.count (built): ${new Date().toISOString()}`
+  // );
 
   const userStreak = await prisma.$queryRawTyped(
     getUserStreakThisMonth(userId, startDate, endDate)
   );
 
-  console.log(`userStreak.custom: ${new Date().toISOString()}`);
+  // console.log(`userStreak.custom: ${new Date().toISOString()}`);
 
   const builtSets = await prisma.brickd_UserCollectionItem.findMany({
     select: {
@@ -353,9 +353,9 @@ const getUserRecaps = async ({
     take: 5,
   });
 
-  console.log(
-    `brickd_UserCollectionItem.findMany: ${new Date().toISOString()}`
-  );
+  // console.log(
+  //   `brickd_UserCollectionItem.findMany: ${new Date().toISOString()}`
+  // );
 
   const sets = builtSets.map((subItem) => {
     subItem.set.setImageUrl = getCloudFrontSetImage(
@@ -373,9 +373,9 @@ const getUserRecaps = async ({
     getUnqiueLocationCountForUser(userId, startDate, endDate)
   );
 
-  console.log(
-    `getUnqiueLocationCountForUser.custom: ${new Date().toISOString()}`
-  );
+  // console.log(
+  //   `getUnqiueLocationCountForUser.custom: ${new Date().toISOString()}`
+  // );
 
   // const totalLocationsUnique = await prisma.brickd_UserCollectionItem.findMany({
   //   where: {
@@ -410,7 +410,7 @@ const getUserRecaps = async ({
     getUserTopLocations(userId, startDate, endDate, 5)
   );
 
-  console.log(`getUserTopLocations.custom: ${new Date().toISOString()}`);
+  // console.log(`getUserTopLocations.custom: ${new Date().toISOString()}`);
 
   // Total Sets Built
 
@@ -418,9 +418,9 @@ const getUserRecaps = async ({
     getTotalPieceCountForUserWithRange(startDate, endDate, userId)
   );
 
-  console.log(
-    `getTotalPieceCountForUserWithRange.custom: ${new Date().toISOString()}`
-  );
+  // console.log(
+  //   `getTotalPieceCountForUserWithRange.custom: ${new Date().toISOString()}`
+  // );
 
   // const totalPieceCount = await prisma.brickd_Set.aggregate({
   //   _sum: {
@@ -458,9 +458,9 @@ const getUserRecaps = async ({
       },
     });
 
-  console.log(
-    `brickd_UserCollection.count (wishlist): ${new Date().toISOString()}`
-  );
+  // console.log(
+  //   `brickd_UserCollection.count (wishlist): ${new Date().toISOString()}`
+  // );
 
   const totalWishListAdded = await prisma.brickd_UserCollectionItem.count({
     where: {
@@ -476,9 +476,9 @@ const getUserRecaps = async ({
     },
   });
 
-  console.log(
-    `brickd_UserCollectionItem.count (wishlist added): ${new Date().toISOString()}`
-  );
+  // console.log(
+  //   `brickd_UserCollectionItem.count (wishlist added): ${new Date().toISOString()}`
+  // );
 
   const totalWishListMoved = await prisma.brickd_DeleteCollectionItemLog.count({
     where: {
@@ -491,15 +491,15 @@ const getUserRecaps = async ({
     },
   });
 
-  console.log(
-    `brickd_DeleteCollectionItemLog.count: ${new Date().toISOString()}`
-  );
+  // console.log(
+  //   `brickd_DeleteCollectionItemLog.count: ${new Date().toISOString()}`
+  // );
 
   const countData = await prisma.$queryRawTyped(
     getUserRecapStandardStats(userId, startDate, endDate)
   );
 
-  console.log(`getUserRecapStandardStats.custom: ${new Date().toISOString()}`);
+  // console.log(`getUserRecapStandardStats.custom: ${new Date().toISOString()}`);
 
   const totalActivities =
     countData.length !== 0 ? Number(countData[0].user_activity_count || 0) : 0;
@@ -550,17 +550,17 @@ const getUserRecaps = async ({
     getUserTopActivityTypesByDate(userId, startDate, endDate)
   );
 
-  console.log(
-    `getUserTopActivityTypesByDate.custom: ${new Date().toISOString()}`
-  );
+  // console.log(
+  //   `getUserTopActivityTypesByDate.custom: ${new Date().toISOString()}`
+  // );
 
   const totalMediaTypes = await prisma.$queryRawTyped(
     getUserTopMediaTypesByDates(userId, startDate, endDate)
   );
 
-  console.log(
-    `getUserTopMediaTypesByDates.custom: ${new Date().toISOString()}`
-  );
+  // console.log(
+  //   `getUserTopMediaTypesByDates.custom: ${new Date().toISOString()}`
+  // );
 
   // top 5 themes
 
@@ -568,15 +568,15 @@ const getUserRecaps = async ({
     getUserTopThemes(userId, startDate, endDate, 5)
   );
 
-  console.log(
-    `getUserTopMediaTypesByDates.custom: ${new Date().toISOString()}`
-  );
+  // console.log(
+  //   `getUserTopMediaTypesByDates.custom: ${new Date().toISOString()}`
+  // );
 
   const topThemeTotalCount = await prisma.$queryRawTyped(
     getUserTopThemeCount(userId, startDate, endDate)
   );
 
-  console.log(`getUserTopThemeCount.custom: ${new Date().toISOString()}`);
+  // console.log(`getUserTopThemeCount.custom: ${new Date().toISOString()}`);
 
   const totalSetsPerUser = globalStats.totalSets / globalStats.totalUsers;
   // top 5 viewed sets
@@ -587,7 +587,7 @@ const getUserRecaps = async ({
     getTopUserActivity(userId, startDate, endDate, 1)
   );
 
-  console.log(`getTopUserActivity.custom: ${new Date().toISOString()}`);
+  // console.log(`getTopUserActivity.custom: ${new Date().toISOString()}`);
 
   if (topActivity.length !== 0) {
     const data = await prisma.brickd_UserActivity.findFirst({
@@ -637,7 +637,7 @@ const getUserRecaps = async ({
       },
     });
 
-    console.log(`brickd_UserActivity.findFirst: ${new Date().toISOString()}`);
+    // console.log(`brickd_UserActivity.findFirst: ${new Date().toISOString()}`);
 
     if (data) {
       if (data.collectionItem) {
@@ -1409,6 +1409,10 @@ export const processRecap = async ({
       `--- Starting with ${user.userName} - ${user.totalSets} sets ----`
     );
 
+    console.log(`Start with Query: ${new Date().toISOString()}`);
+
+    const start = performance.now();
+
     const data = await getUserRecaps({
       userId: user.id,
       start: startDate.toISOString(),
@@ -1423,6 +1427,10 @@ export const processRecap = async ({
 
     console.log(`Done with Query: ${new Date().toISOString()}`);
 
+    const end = performance.now();
+
+    console.log(`Time: ${end - start}ms`);
+
     await uploadUserRecaps({
       data: JSON.stringify(data),
       key: mediaKey,
@@ -1434,6 +1442,8 @@ export const processRecap = async ({
 
     const timeDiff = (later - now).toFixed(3);
 
+    console.log(`Full Time: ${timeDiff}ms`);
+
     let recapId: number | null = null;
 
     const id = await prisma.brickd_UserRecap.findFirst({
@@ -1442,6 +1452,8 @@ export const processRecap = async ({
         reportDate: startDate.toDate(),
       },
     });
+
+    console.log(`Recap: ${id ? "YES" : "NO"}`);
 
     if (!id) {
       const response = await prisma.brickd_UserRecap.create({
@@ -1458,6 +1470,7 @@ export const processRecap = async ({
 
       recapId = response.id;
     } else {
+      console.log("UPDATING");
       recapId = id.id;
       await prisma.brickd_UserRecap.updateMany({
         data: {
