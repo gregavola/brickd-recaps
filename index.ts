@@ -1347,7 +1347,7 @@ export const processRecap = async ({
           getAudienceForMonthlyRecapsWithOffsetRebuild(
             startDate.toDate(),
             endDate.toDate(),
-            offset,
+            offset!,
             100
           )
         )
