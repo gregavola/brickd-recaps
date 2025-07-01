@@ -848,7 +848,13 @@ export const sendLoopsEvent = async ({
   return data;
 };
 
-export const kickOffTasks = async ({ reportId }: { reportId: number }) => {
+export const kickOffTasks = async ({
+  reportId,
+  rebuild,
+}: {
+  reportId: number;
+  rebuild?: boolean;
+}) => {
   dayjs.extend(utc);
 
   const data = await prisma.brickd_UserRecapReport.findFirst({
@@ -913,6 +919,9 @@ export const kickOffTasks = async ({ reportId }: { reportId: number }) => {
         reportId,
         logId: data.id,
         batch: true,
+        ...(rebuild && {
+          rebuild: true,
+        }),
       };
 
       const input: InvokeCommandInput = {
@@ -1570,7 +1579,7 @@ export const handler = async (event: any, context?: Context) => {
       console.error(`Missing Report ID`);
     } else {
       console.log("== KICK OFF TASKS ===");
-      await kickOffTasks({ reportId });
+      await kickOffTasks({ reportId, rebuild });
     }
   }
 };
