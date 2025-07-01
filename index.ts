@@ -1331,16 +1331,18 @@ export const processRecap = async ({
     `Starting for ${startDate.toISOString()} to ${endDate.toISOString()}`
   );
 
+  const hasOffset = offset !== undefined;
+
   if (userId) {
     console.log(`== TEST RUN for ${userId}===`);
   }
 
-  if (offset) {
+  if (hasOffset) {
     console.log(`== OFFSET RUN for ${offset}===`);
   }
 
   const results =
-    rebuild && offset
+    rebuild && hasOffset
       ? await prisma.$queryRawTyped(
           getAudienceForMonthlyRecapsWithOffsetRebuild(
             startDate.toDate(),
@@ -1349,13 +1351,13 @@ export const processRecap = async ({
             100
           )
         )
-      : offset
+      : hasOffset
       ? await prisma.$queryRawTyped(
           getAudienceForMonthlyRecapsWithOffset(
             startDate.toDate(),
             endDate.toDate(),
             reportId,
-            offset,
+            offset!,
             100
           )
         )
