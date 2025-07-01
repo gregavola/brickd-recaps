@@ -999,15 +999,13 @@ export const sendEmails = async ({ reportId }: { reportId: number }) => {
         select: {
           userName: true,
           uuid: true,
+          enableCommunicationEmails: true,
         },
       },
     },
     where: {
       reportId,
       status: "QUEUED",
-      user: {
-        enableCommunicationEmails: 1,
-      },
       emailResponse: null,
     },
     orderBy: { userId: "asc" },
@@ -1031,44 +1029,68 @@ export const sendEmails = async ({ reportId }: { reportId: number }) => {
         },
       });
 
-      const recap = await getUserRecapS3({
-        key: user.dataUrl,
-      });
-
-      if (user.user && recap.data) {
-        const results = await sendLoopsEvent({
-          userId: user.user.uuid,
-          eventName: "monthly-recaps",
-          properties: {
-            totalSets: recap.data?.stories.sets.totalSetsAdded,
-            dateHeader: dayjs.utc(recap.data?.reportDate).format("MMMM YYYY"),
-            piecesBuilt: recap.data.stories.sets.totalPieceCount,
-            totalMinifigures: recap.data.stories.minifigs.totalMinifigsAdded,
-            setsBuilt: recap.data?.stories.sets.totalSetsBuilt,
-            recapUrl: `https://getbrickd.com/user-recaps/${user.uuid}`,
+      if (user.user.enableCommunicationEmails === 0) {
+        await prisma.brickd_UserRecap.update({
+          data: {
+            status: "COMPLETE",
+            emailResponse: JSON.stringify({ skipped: true }),
+            statusDate: new Date(),
+          },
+          where: {
+            uuid: user.uuid,
           },
         });
+      } else {
+        const recap = await getUserRecapS3({
+          key: user.dataUrl,
+        });
 
-        if (results) {
-          if (results.success) {
-            const end = performance.now();
+        if (user.user && recap.data) {
+          const results = await sendLoopsEvent({
+            userId: user.user.uuid,
+            eventName: "monthly-recaps",
+            properties: {
+              totalSets: recap.data?.stories.sets.totalSetsAdded,
+              dateHeader: dayjs.utc(recap.data?.reportDate).format("MMMM YYYY"),
+              piecesBuilt: recap.data.stories.sets.totalPieceCount,
+              totalMinifigures: recap.data.stories.minifigs.totalMinifigsAdded,
+              setsBuilt: recap.data?.stories.sets.totalSetsBuilt,
+              recapUrl: `https://getbrickd.com/user-recaps/${user.uuid}?utm_source=email`,
+            },
+          });
 
-            await prisma.brickd_UserRecap.update({
-              data: {
-                status: "COMPLETE",
-                emailResponse: JSON.stringify(results),
-                emailTimeTaken: end - now,
-                emailSentAt: new Date(),
-              },
-              where: {
-                id: user.id,
-              },
-            });
+          if (results) {
+            if (results.success) {
+              const end = performance.now();
+
+              await prisma.brickd_UserRecap.update({
+                data: {
+                  status: "COMPLETE",
+                  emailResponse: JSON.stringify(results),
+                  emailTimeTaken: end - now,
+                  emailSentAt: new Date(),
+                },
+                where: {
+                  id: user.id,
+                },
+              });
+            } else {
+              await prisma.brickd_UserRecap.update({
+                data: {
+                  status: "ERROR",
+                  emailResponse: JSON.stringify(results),
+                  emailSentAt: new Date(),
+                },
+                where: {
+                  id: user.id,
+                },
+              });
+            }
           } else {
             await prisma.brickd_UserRecap.update({
               data: {
                 status: "ERROR",
-                emailResponse: JSON.stringify(results),
+                emailResponse: "Unknown Error (Empty Response)",
                 emailSentAt: new Date(),
               },
               where: {
@@ -1080,25 +1102,14 @@ export const sendEmails = async ({ reportId }: { reportId: number }) => {
           await prisma.brickd_UserRecap.update({
             data: {
               status: "ERROR",
-              emailResponse: "Unknown Error (Empty Response)",
-              emailSentAt: new Date(),
+              emailResponse: "invaid user or recap.data",
+              statusDate: new Date(),
             },
             where: {
               id: user.id,
             },
           });
         }
-      } else {
-        await prisma.brickd_UserRecap.update({
-          data: {
-            status: "ERROR",
-            emailResponse: "invaid user or recap.data",
-            statusDate: new Date(),
-          },
-          where: {
-            id: user.id,
-          },
-        });
       }
     } catch (err: any) {
       console.log(err);
