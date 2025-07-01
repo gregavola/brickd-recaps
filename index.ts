@@ -7,6 +7,7 @@ import {
   getAudienceCount,
   getAudienceForMonthlyRecaps,
   getAudienceForMonthlyRecapsWithOffset,
+  getAudienceForMonthlyRecapsWithOffsetRebuild,
   getAudienceForMonthlyRecapTest,
   getGlobalBuiltStats,
   getTopUserActivity,
@@ -696,15 +697,15 @@ const getUserRecaps = async ({
       streaks: {
         longestStreak:
           userStreak.length !== 0
-            ? Number(userStreak[0].longest_streak || 0)
+            ? Number(userStreak[0].longest_streak_length || 0)
             : 0,
         longestStreakDates:
           userStreak.length !== 0 &&
-          userStreak[0].longest_streak_start_date &&
-          userStreak[0].longest_streak_end_date
+          userStreak[0].longest_streak_start &&
+          userStreak[0].longest_streak_end
             ? {
-                start: userStreak[0].longest_streak_start_date,
-                end: userStreak[0].longest_streak_end_date,
+                start: userStreak[0].longest_streak_start,
+                end: userStreak[0].longest_streak_end,
               }
             : null,
       },
@@ -1289,12 +1290,14 @@ export const processRecap = async ({
   logId,
   sendEmail,
   reportId,
+  rebuild,
 }: {
   userId?: number;
   offset?: number;
   logId: number | null;
   sendEmail?: boolean;
   reportId: number;
+  rebuild?: boolean;
 }) => {
   const data = await prisma.brickd_UserRecapReport.findFirst({
     where: { id: reportId },
@@ -1327,32 +1330,42 @@ export const processRecap = async ({
     console.log(`== OFFSET RUN for ${offset}===`);
   }
 
-  const results = offset
-    ? await prisma.$queryRawTyped(
-        getAudienceForMonthlyRecapsWithOffset(
-          startDate.toDate(),
-          endDate.toDate(),
-          reportId,
-          offset,
-          100
+  const results =
+    rebuild && offset
+      ? await prisma.$queryRawTyped(
+          getAudienceForMonthlyRecapsWithOffsetRebuild(
+            startDate.toDate(),
+            endDate.toDate(),
+            offset,
+            100
+          )
         )
-      )
-    : userId
-    ? await prisma.$queryRawTyped(
-        getAudienceForMonthlyRecapTest(
-          startDate.toDate(),
-          endDate.toDate(),
-          reportId,
-          userId
+      : offset
+      ? await prisma.$queryRawTyped(
+          getAudienceForMonthlyRecapsWithOffset(
+            startDate.toDate(),
+            endDate.toDate(),
+            reportId,
+            offset,
+            100
+          )
         )
-      )
-    : await prisma.$queryRawTyped(
-        getAudienceForMonthlyRecaps(
-          startDate.toDate(),
-          endDate.toDate(),
-          reportId
+      : userId
+      ? await prisma.$queryRawTyped(
+          getAudienceForMonthlyRecapTest(
+            startDate.toDate(),
+            endDate.toDate(),
+            reportId,
+            userId
+          )
         )
-      );
+      : await prisma.$queryRawTyped(
+          getAudienceForMonthlyRecaps(
+            startDate.toDate(),
+            endDate.toDate(),
+            reportId
+          )
+        );
 
   const globalStats = await getMonthlyStats({
     startDate: startDate.toDate(),
@@ -1501,6 +1514,7 @@ export const handler = async (event: any, context?: Context) => {
     offset,
     emails,
     logId,
+    rebuild,
     reportDate,
     incremental,
     reportId,
@@ -1510,6 +1524,7 @@ export const handler = async (event: any, context?: Context) => {
     batch?: boolean;
     emails?: boolean;
     offset?: number;
+    rebuild?: boolean;
     reportDate?: string;
     reportId?: number;
     logId?: number;
@@ -1535,7 +1550,7 @@ export const handler = async (event: any, context?: Context) => {
     }
 
     console.log(`== BATCH ${offset} ===`);
-    await processRecap({ offset: offset || 0, logId, reportId });
+    await processRecap({ offset: offset || 0, logId, reportId, rebuild });
   } else if (incremental) {
     if (!reportId) {
       throw new Error("Missing ReportId");

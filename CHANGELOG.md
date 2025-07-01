@@ -1,3 +1,7 @@
+# 1.0.3
+
+- Adding rebuild method
+
 # 1.0.2
 
 - More automated system
