@@ -931,16 +931,6 @@ export const kickOffTasks = async ({ reportId }: { reportId: number }) => {
       console.error(err);
     }
   }
-
-  await prisma.brickd_UserRecapReport.update({
-    data: {
-      endTime: new Date(),
-      status: "COMPLETE",
-    },
-    where: {
-      id: reportId,
-    },
-  });
 };
 
 export const getUserRecapS3 = async ({
