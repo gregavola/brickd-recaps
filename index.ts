@@ -875,6 +875,7 @@ export const kickOffTasks = async ({
   await prisma.brickd_UserRecapReport.update({
     data: {
       startTime: new Date(),
+      updatedAt: new Date(),
       status: "RUNNING",
     },
     where: {
@@ -1506,7 +1507,7 @@ export const processRecap = async ({
       const count = await prisma.brickd_UserRecapReportLog.count({
         where: {
           reportId,
-          status: { not: "JOBCOMPLETE" },
+          offset: { gt: offset },
         },
       });
 
