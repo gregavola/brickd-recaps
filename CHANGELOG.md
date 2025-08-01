@@ -1,6 +1,7 @@
 # 1.0.3
 
 - Adding rebuild method
+- Email Fixing utc
 
 # 1.0.2
 

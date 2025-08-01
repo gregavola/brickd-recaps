@@ -971,6 +971,7 @@ export const getUserRecapS3 = async ({
 };
 
 export const sendEmails = async ({ reportId }: { reportId: number }) => {
+  dayjs.extend(utc);
   const data = await prisma.brickd_UserRecapReport.findFirst({
     where: { id: reportId },
   });
