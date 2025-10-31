@@ -2499,7 +2499,7 @@ export const processYearInBricks = async ({
           createdAt: new Date(),
           collectionCount: 0,
           dataUrlStatus: 200,
-          dataUrl: `https://brickd-yib.s3.amazonaws.com${mediaKey}`,
+          dataUrl: `https://brickd-yib.s3.amazonaws.com/${mediaKey}`,
         },
       });
 
