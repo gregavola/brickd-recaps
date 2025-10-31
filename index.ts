@@ -71,6 +71,7 @@ export interface Set {
 
 export interface CollectionItem {
   set: Set;
+  notes: string | null;
 }
 
 export interface MinifigInfo {
@@ -207,6 +208,7 @@ interface YearInBricks {
     followers: number;
   };
   discussions?: {
+    count: number;
     topPost: YIBDiscussion | null;
     likes: number;
     comments: number;
@@ -594,6 +596,7 @@ const getYearInBricksReview = async ({
         },
         collectionItem: {
           select: {
+            notes: true,
             set: {
               select: {
                 uuid: true,
@@ -762,6 +765,7 @@ const getYearInBricksReview = async ({
   if (discussions.length !== 0) {
     yearinBricks.discussions = {
       topPost: yibDiscussion,
+      count: Number(discussions[0].discussions_created),
       comments: Number(discussions[0].comments_on_your_discussions),
       likes: Number(discussions[0].likes_received_total),
       views: Number(discussions[0].discussion_views_received),
