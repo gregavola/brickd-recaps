@@ -1,3 +1,7 @@
+# 2.0.0
+
+- Year in Bricks Setup
+
 # 1.0.3
 
 - Adding rebuild method
