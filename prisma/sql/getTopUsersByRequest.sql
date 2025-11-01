@@ -8,7 +8,7 @@ WITH
             brickd."brickd_Requests" r
         WHERE
             r."createdAt" >= $1
-            AND r."userId" NOT IN (0, 1)
+            AND r."userId" NOT IN (0)
             -- (optional, if nullable) AND r."userId" IS NOT NULL
         GROUP BY
             r."userId"

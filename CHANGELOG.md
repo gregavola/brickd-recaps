@@ -1,6 +1,7 @@
 # 2.0.0
 
 - Year in Bricks Setup
+- Email Fixes for both User Recaps and YIB
 
 # 1.0.3
 

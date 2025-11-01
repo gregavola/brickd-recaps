@@ -1739,6 +1739,8 @@ export const sendEmails = async ({ reportId }: { reportId: number }) => {
     throw new Error(`Invalid Report found for ${reportId}`);
   }
 
+  const { isYIB } = data;
+
   await prisma.brickd_UserRecapReport.update({
     data: {
       status: "RUNNING",
@@ -1779,27 +1781,54 @@ export const sendEmails = async ({ reportId }: { reportId: number }) => {
     const now = performance.now();
 
     try {
-      await prisma.brickd_UserRecap.update({
-        data: {
-          status: "RUNNING",
-          statusDate: new Date(),
-        },
-        where: {
-          uuid: user.uuid,
-        },
-      });
-
-      if (user.user.enableCommunicationEmails === 0) {
+      if (isYIB === 1) {
+        await prisma.brickd_YearInBrickUser.updateMany({
+          data: {
+            status: "RUNNING",
+            updatedAt: new Date(),
+          },
+          where: {
+            reportId,
+            userId: user.id,
+          },
+        });
+      } else {
         await prisma.brickd_UserRecap.update({
           data: {
-            status: "COMPLETE",
-            emailResponse: JSON.stringify({ skipped: true }),
+            status: "RUNNING",
             statusDate: new Date(),
           },
           where: {
             uuid: user.uuid,
           },
         });
+      }
+
+      if (user.user.enableCommunicationEmails === 0) {
+        if (isYIB === 1) {
+          await prisma.brickd_YearInBrickUser.updateMany({
+            data: {
+              status: "COMPLETE",
+              emailResponse: JSON.stringify({ skipped: true }),
+              updatedAt: new Date(),
+            },
+            where: {
+              reportId,
+              userId: user.id,
+            },
+          });
+        } else {
+          await prisma.brickd_UserRecap.update({
+            data: {
+              status: "COMPLETE",
+              emailResponse: JSON.stringify({ skipped: true }),
+              statusDate: new Date(),
+            },
+            where: {
+              uuid: user.uuid,
+            },
+          });
+        }
       } else {
         const recap = await getUserRecapS3({
           key: user.dataUrl,
@@ -1808,37 +1837,101 @@ export const sendEmails = async ({ reportId }: { reportId: number }) => {
         if (user.user && recap.data) {
           const results = await sendLoopsEvent({
             userId: user.user.uuid,
-            eventName: "monthly-recaps",
-            properties: {
-              totalSets: recap.data?.stories.sets.totalSetsAdded,
-              dateHeader: dayjs.utc(recap.data?.reportDate).format("MMMM YYYY"),
-              piecesBuilt: recap.data.stories.sets.totalPieceCount,
-              totalMinifigures: recap.data.stories.minifigs.totalMinifigsAdded,
-              setsBuilt: recap.data?.stories.sets.totalSetsBuilt,
-              recapUrl: `https://getbrickd.com/user-recaps/${user.uuid}?utm_source=email`,
-            },
+            eventName: isYIB === 1 ? "yib-recap" : "monthly-recaps",
+            properties:
+              isYIB === 1
+                ? {
+                    yibYear: data.yibYear,
+                  }
+                : {
+                    totalSets: recap.data?.stories.sets.totalSetsAdded,
+                    dateHeader: dayjs
+                      .utc(recap.data?.reportDate)
+                      .format("MMMM YYYY"),
+                    piecesBuilt: recap.data.stories.sets.totalPieceCount,
+                    totalMinifigures:
+                      recap.data.stories.minifigs.totalMinifigsAdded,
+                    setsBuilt: recap.data?.stories.sets.totalSetsBuilt,
+                    recapUrl: `https://getbrickd.com/user-recaps/${user.uuid}?utm_source=email`,
+                  },
           });
 
           if (results) {
             if (results.success) {
               const end = performance.now();
 
-              await prisma.brickd_UserRecap.update({
+              if (isYIB === 1) {
+                await prisma.brickd_YearInBrickUser.updateMany({
+                  data: {
+                    status: "COMPLETE",
+                    emailResponse: JSON.stringify(results),
+                    updatedAt: new Date(),
+                    emailSentAt: new Date(),
+                  },
+                  where: {
+                    reportId,
+                    userId: user.id,
+                  },
+                });
+              } else {
+                await prisma.brickd_UserRecap.update({
+                  data: {
+                    status: "COMPLETE",
+                    emailResponse: JSON.stringify(results),
+                    emailTimeTaken: end - now,
+                    emailSentAt: new Date(),
+                  },
+                  where: {
+                    id: user.id,
+                  },
+                });
+              }
+            } else {
+              if (isYIB === 1) {
+                await prisma.brickd_YearInBrickUser.updateMany({
+                  data: {
+                    status: "ERROR",
+                    emailResponse: JSON.stringify(results),
+                    updatedAt: new Date(),
+                    emailSentAt: new Date(),
+                  },
+                  where: {
+                    reportId,
+                    userId: user.id,
+                  },
+                });
+              } else {
+                await prisma.brickd_UserRecap.update({
+                  data: {
+                    status: "ERROR",
+                    emailResponse: JSON.stringify(results),
+                    emailSentAt: new Date(),
+                  },
+                  where: {
+                    id: user.id,
+                  },
+                });
+              }
+            }
+          } else {
+            if (isYIB === 1) {
+              await prisma.brickd_YearInBrickUser.updateMany({
                 data: {
-                  status: "COMPLETE",
-                  emailResponse: JSON.stringify(results),
-                  emailTimeTaken: end - now,
+                  status: "ERROR",
+                  emailResponse: "Unknown Error (Empty Response)",
+                  updatedAt: new Date(),
                   emailSentAt: new Date(),
                 },
                 where: {
-                  id: user.id,
+                  reportId,
+                  userId: user.id,
                 },
               });
             } else {
               await prisma.brickd_UserRecap.update({
                 data: {
                   status: "ERROR",
-                  emailResponse: JSON.stringify(results),
+                  emailResponse: "Unknown Error (Empty Response)",
                   emailSentAt: new Date(),
                 },
                 where: {
@@ -1846,44 +1939,61 @@ export const sendEmails = async ({ reportId }: { reportId: number }) => {
                 },
               });
             }
+          }
+        } else {
+          if (isYIB === 1) {
+            await prisma.brickd_YearInBrickUser.updateMany({
+              data: {
+                status: "ERROR",
+                emailResponse: "invaid user or recap.data",
+                updatedAt: new Date(),
+              },
+              where: {
+                reportId,
+                userId: user.id,
+              },
+            });
           } else {
             await prisma.brickd_UserRecap.update({
               data: {
                 status: "ERROR",
-                emailResponse: "Unknown Error (Empty Response)",
-                emailSentAt: new Date(),
+                emailResponse: "invaid user or recap.data",
+                statusDate: new Date(),
               },
               where: {
                 id: user.id,
               },
             });
           }
-        } else {
-          await prisma.brickd_UserRecap.update({
-            data: {
-              status: "ERROR",
-              emailResponse: "invaid user or recap.data",
-              statusDate: new Date(),
-            },
-            where: {
-              id: user.id,
-            },
-          });
         }
       }
     } catch (err: any) {
       console.log(err);
 
-      await prisma.brickd_UserRecap.update({
-        data: {
-          status: "ERROR",
-          emailResponse: err.message,
-          statusDate: new Date(),
-        },
-        where: {
-          id: user.id,
-        },
-      });
+      if (isYIB === 1) {
+        await prisma.brickd_YearInBrickUser.updateMany({
+          data: {
+            status: "ERROR",
+            emailResponse: err.message,
+            updatedAt: new Date(),
+          },
+          where: {
+            reportId,
+            userId: user.id,
+          },
+        });
+      } else {
+        await prisma.brickd_UserRecap.update({
+          data: {
+            status: "ERROR",
+            emailResponse: err.message,
+            statusDate: new Date(),
+          },
+          where: {
+            id: user.id,
+          },
+        });
+      }
     } finally {
       const end = performance.now();
       console.log(`Time: ${(end - now).toFixed(2)}ms`);
