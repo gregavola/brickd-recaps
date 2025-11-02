@@ -2185,6 +2185,24 @@ export const getMostRecentRecapReport = async () => {
   return { id: data.id, isYIB: data.isYIB };
 };
 
+export const getReportMedataData = async ({
+  reportId,
+}: {
+  reportId: number;
+}) => {
+  const data = await prisma.brickd_UserRecapReport.findFirst({
+    where: {
+      id: reportId,
+    },
+  });
+
+  if (!data) {
+    return null;
+  }
+
+  return { id: data.id, isYIB: data.isYIB };
+};
+
 export const getReportMetadataFromId = async ({
   reportId,
 }: {
@@ -2463,9 +2481,7 @@ export const processYearInBricks = async ({
 
   const { yibYear } = data;
 
-  console.log(`
-    Year In Bricks Report: ${yibYear}
-    `);
+  console.log(`Year In Bricks Report: ${yibYear}`);
 
   dayjs.extend(utc);
 
@@ -2542,10 +2558,6 @@ export const processYearInBricks = async ({
 
   let recap: any | null = null;
 
-  const dateKey = startDate.format("YYYY");
-
-  console.log(`REPORT DATE: ${dateKey}`);
-
   for await (const user of results) {
     const now = performance.now();
 
@@ -2566,7 +2578,7 @@ export const processYearInBricks = async ({
 
     recap = data;
 
-    const mediaKey = `${dateKey}/${user.uuid}.json`;
+    const mediaKey = `${yibYear}/${user.uuid}.json`;
 
     console.log(`Done with Query: ${new Date().toISOString()}`);
 
@@ -2617,10 +2629,11 @@ export const processYearInBricks = async ({
     } else {
       console.log("UPDATING");
       recapId = id.id;
-      await prisma.brickd_UserRecap.updateMany({
+      await prisma.brickd_YearInBrickUser.updateMany({
         data: {
           updatedAt: new Date(),
-          dataUrl: `https://brickd-yib.s3.amazonaws.com${mediaKey}`,
+          itemCount: Number(user.totalSets),
+          dataUrl: `https://brickd-yib.s3.amazonaws.com/${mediaKey}`,
           timeTaken: parseFloat(timeDiff),
         },
         where: {
@@ -2675,11 +2688,11 @@ export const handler = async (event: any, context?: Context) => {
   } else if (userId) {
     console.log(`== SINGLE ${userId} ===`);
 
-    let newReportId: number | null = reportId || null;
+    console.log(`Passed Report ID: ${reportId || "NOT_PASSED"}`);
 
-    console.log(`Passed Report ID: ${newReportId}`);
-
-    const reportData = await getMostRecentRecapReport();
+    const reportData = reportId
+      ? await getReportMedataData({ reportId })
+      : await getMostRecentRecapReport();
 
     if (!reportData) {
       throw new Error("Unable to find Report ID");
@@ -2688,13 +2701,13 @@ export const handler = async (event: any, context?: Context) => {
     if (reportData.isYIB === 1) {
       await processYearInBricks({
         userId: event.userId,
-        reportId: newReportId || reportData.id,
+        reportId: reportData.id,
         logId: null,
       });
     } else {
       await processRecap({
         userId: event.userId,
-        reportId: newReportId || reportData.id,
+        reportId: reportData.id,
         logId: null,
       });
     }
