@@ -1,5 +1,6 @@
-# 2.0.0
+# 2.0.1
 
+- SQS For Batch for User Recaps
 - Year in Bricks Setup
 - Email Fixes for both User Recaps and YIB
 

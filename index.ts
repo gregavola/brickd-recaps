@@ -1,4 +1,4 @@
-import { Context } from "aws-lambda";
+import { Context, SQSBatchResponse, SQSRecord } from "aws-lambda";
 import { DateTime } from "luxon";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
@@ -39,6 +39,7 @@ import {
 } from "@prisma/client/sql";
 import prisma from "./db";
 import s3 from "./s3";
+import sqs from "./sqs";
 import lambdaClient from "./lambda";
 import {
   GetObjectCommand,
@@ -57,6 +58,8 @@ import {
   Prisma,
 } from "@prisma/client";
 import { JsonArray } from "@prisma/client/runtime/library";
+import { SendMessageCommand } from "@aws-sdk/client-sqs";
+import { Redis, SetCommandOptions } from "@upstash/redis";
 
 // types
 
@@ -292,6 +295,26 @@ const uploadUserRecaps = async ({
   return response;
 };
 
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL || "",
+  token: process.env.UPSTASH_REDIS_REST_TOKEN || "",
+});
+
+const upstash = {
+  get: async (key: string) => {
+    return await redis.get(key);
+  },
+  set: async (key: string, data: any, opts?: SetCommandOptions) => {
+    return await redis.set(key, data, opts);
+  },
+  del: async (key: string) => {
+    return await redis.del(key);
+  },
+  smismember: async (key: string, members: string[]) => {
+    return await redis.smismember(key, members);
+  },
+};
+
 const getCloudFrontSetImage = (
   setNumber: string,
   customImageUrl: string | null,
@@ -408,8 +431,6 @@ const getYearInBricksReview = async ({
       const topDayHour = await prisma.$queryRawTyped(
         yibTopUserHourDay(userId, startDate, endDate)
       );
-
-      console.log(topDayHour);
 
       yearinBricks.numbers = {
         addedToList: Number(item.total_sets_added),
@@ -1596,6 +1617,12 @@ const getMonthlyStats = async ({
   startDate: Date;
   endDate: Date;
 }): Promise<GlobalStats> => {
+  const cachedData = await upstash.get("global-yib-stats");
+
+  if (cachedData) {
+    return <GlobalStats>cachedData;
+  }
+
   const data = await prisma.$queryRawTyped(
     getGlobalBuiltStats(startDate, endDate)
   );
@@ -1604,12 +1631,16 @@ const getMonthlyStats = async ({
     throw new Error("Empty Global");
   }
 
-  return {
+  const values = {
     totalUsers: Number(data[0].totalUsers),
     totalDistinctSets: Number(data[0].totalDistinctSets),
     totalPieces: Number(data[0].totalPieces),
     totalSets: Number(data[0].totalSets),
   };
+
+  await upstash.set(`global-yib-stats`, values);
+
+  return values;
 };
 
 export const sendLoopsEvent = async ({
@@ -1684,7 +1715,9 @@ export const kickOffTasks = async ({
 
   console.log(`Total Users: ${results.length}`);
 
-  const totalPages = Math.ceil(results.length / 100);
+  const offsetKey = data.isYIB === 1 ? 300 : 100;
+
+  const totalPages = Math.ceil(results.length / offsetKey);
 
   const pagesArray: number[] = [];
 
@@ -1695,7 +1728,7 @@ export const kickOffTasks = async ({
   console.log(`=== Total Pages: ${pagesArray.length} ===`);
 
   for await (const item of pagesArray) {
-    const offset = item * 100;
+    const offset = item * offsetKey;
     const data = await prisma.brickd_UserRecapReportLog.create({
       data: {
         createdAt: new Date(),
@@ -1724,18 +1757,25 @@ export const kickOffTasks = async ({
         }),
       };
 
-      const input: InvokeCommandInput = {
-        FunctionName: "brickd-recaps",
-        InvocationType: "Event",
-        Payload: Buffer.from(JSON.stringify(payload), "utf8"),
-      };
+      const command = new SendMessageCommand({
+        QueueUrl:
+          "https://sqs.us-east-1.amazonaws.com/726013842547/brickd-user-recaps",
+        MessageBody: JSON.stringify(payload),
+      });
 
-      const command = new InvokeCommand(input);
+      const results = await sqs.send(command);
 
-      const res: InvokeCommandOutput = await lambdaClient.send(command);
+      await prisma.brickd_UserRecapReportLog.update({
+        data: {
+          sqsIngestedAt: new Date(),
+          sqsMessageId: results.MessageId,
+        },
+        where: {
+          id: data.id,
+        },
+      });
 
       console.log(`Lambda for ${offset} - ${JSON.stringify(payload)}`);
-      console.log(JSON.stringify(res));
     } catch (err) {
       console.log(`🔴 Error`);
       console.error(err);
@@ -2368,6 +2408,7 @@ export const processRecap = async ({
   console.log(JSON.stringify(globalTotalMediaUploaded));
 
   let recap: any | null = null;
+  let offsetValue: number = offset || 0;
 
   const dateKey = startDate.format("MM_YY");
 
@@ -2461,37 +2502,51 @@ export const processRecap = async ({
       await sendSingleEmail({ userId: user.id, recapId });
     }
 
-    if (logId) {
+    if (logId && offsetValue) {
       await prisma.brickd_UserRecapReportLog.update({
         data: {
           updatedAt: new Date(),
-          endTime: new Date(),
-          status: "JOBCOMPLETE",
+          currentOffset: offsetValue,
         },
         where: {
           id: logId,
         },
       });
 
-      const count = await prisma.brickd_UserRecapReportLog.count({
+      offsetValue++;
+    }
+  }
+
+  if (logId) {
+    await prisma.brickd_UserRecapReportLog.update({
+      data: {
+        updatedAt: new Date(),
+        endTime: new Date(),
+        status: "JOBCOMPLETE",
+      },
+      where: {
+        id: logId,
+      },
+    });
+
+    const count = await prisma.brickd_UserRecapReportLog.count({
+      where: {
+        reportId,
+        offset: { gt: offset },
+      },
+    });
+
+    if (count === 0) {
+      await prisma.brickd_UserRecapReport.update({
+        data: {
+          status: "COMPLETE",
+          endTime: new Date(),
+          updatedAt: new Date(),
+        },
         where: {
-          reportId,
-          offset: { gt: offset },
+          id: reportId,
         },
       });
-
-      if (count === 0) {
-        await prisma.brickd_UserRecapReport.update({
-          data: {
-            status: "COMPLETE",
-            endTime: new Date(),
-            updatedAt: new Date(),
-          },
-          where: {
-            id: reportId,
-          },
-        });
-      }
     }
   }
 };
@@ -2520,6 +2575,19 @@ export const processYearInBricks = async ({
   }
 
   const { yibYear } = data;
+
+  if (logId) {
+    await prisma.brickd_UserRecapReportLog.update({
+      data: {
+        updatedAt: new Date(),
+        endTime: new Date(),
+        status: "RUNNING",
+      },
+      where: {
+        id: logId,
+      },
+    });
+  }
 
   console.log(`Year In Bricks Report: ${yibYear}`);
 
@@ -2580,23 +2648,14 @@ export const processYearInBricks = async ({
     endDate: endDate.toDate(),
   });
 
-  const globalTotalMediaUploaded =
-    await prisma.brickd_UserCollectionItemMedia.count({
-      where: {
-        createdAt: {
-          gte: startDate.toDate(),
-          lte: endDate.toDate(),
-        },
-      },
-    });
-
   console.log(`Global Stats`);
   console.log(JSON.stringify(globalStats));
 
-  console.log(`Global Media Count:`);
-  console.log(JSON.stringify(globalTotalMediaUploaded));
-
   let recap: any | null = null;
+  let offsetValue: number = offset || 0;
+  let masterTime: number, masterEndTime: number;
+
+  masterTime = performance.now();
 
   for await (const user of results) {
     const now = performance.now();
@@ -2682,10 +2741,64 @@ export const processYearInBricks = async ({
         },
       });
     }
+
+    if (logId && offsetValue) {
+      await prisma.brickd_UserRecapReportLog.update({
+        data: {
+          updatedAt: new Date(),
+          currentOffset: offsetValue,
+        },
+        where: {
+          id: logId,
+        },
+      });
+    }
+
+    offsetValue++;
+  }
+  masterEndTime = performance.now();
+
+  if (logId) {
+    const timeDiff = (masterEndTime - masterTime).toFixed(3);
+
+    await prisma.brickd_UserRecapReportLog.update({
+      data: {
+        updatedAt: new Date(),
+        endTime: new Date(),
+        status: "JOBCOMPLETE",
+        timeTaken: parseFloat(timeDiff),
+      },
+      where: {
+        id: logId,
+      },
+    });
+  }
+
+  if (logId && offset) {
+    console.log(`${offset} 🟢 Complete`);
   }
 };
 
-export const handler = async (event: any, context?: Context) => {
+/** ---------- Type guards ---------- */
+const isSqsEvent = (event: any): event is { Records: SQSRecord[] } =>
+  Array.isArray(event?.Records) &&
+  event.Records.length > 0 &&
+  event.Records[0].eventSource === "aws:sqs";
+
+const parseApiPayload = (event: any) => {
+  // Accept: direct invoke with object, Function URL/API GW with JSON body string
+  if (typeof event === "string") return JSON.parse(event);
+  if (event?.body && typeof event.body === "string") {
+    try {
+      return JSON.parse(event.body);
+    } catch {
+      /* fallthrough */
+    }
+  }
+  return event ?? {};
+};
+
+export const runOne = async (event: any, context?: Context) => {
   console.log(`🚧 [DEBUG] 🟢 - Getting Started`);
 
   console.log(`Event: ${JSON.stringify(event, null, 2)}`);
@@ -2808,3 +2921,47 @@ export const handler = async (event: any, context?: Context) => {
     }
   }
 };
+
+export const handler = async (event: any, context?: Context): Promise<any> => {
+  console.log("🚧 [DEBUG] 🟢 - Start");
+  console.log(`Event: ${JSON.stringify(event, null, 2)}`);
+
+  if (isSqsEvent(event)) {
+    console.log(`SQS EVENT`);
+    // SQS path: iterate records and return partial failures
+    const failures: { itemIdentifier: string }[] = [];
+
+    for (const rec of event.Records) {
+      try {
+        const body = safeParse(rec.body);
+        await runOne(body); // runs one at a time, logs in order
+      } catch (err) {
+        console.error("Record failed:", rec.messageId, err);
+        failures.push({ itemIdentifier: rec.messageId });
+      }
+    }
+
+    const resp: SQSBatchResponse = { batchItemFailures: failures };
+    console.log(`SQS result: ${JSON.stringify(resp)}`);
+    return resp;
+  } else {
+    console.log("manual EVENT");
+    // API / manual path
+    const payload = parseApiPayload(event);
+    try {
+      const result = await runOne(payload);
+      return result; // direct invoke
+    } catch (err: any) {
+      console.error(err);
+      throw err; // let direct invoke surface the error
+    }
+  }
+};
+
+function safeParse(s: string) {
+  try {
+    return JSON.parse(s);
+  } catch {
+    return {};
+  }
+}
