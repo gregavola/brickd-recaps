@@ -30,6 +30,7 @@ import {
   yibGetUserTopThemes,
   yibMinifiguresByUser,
   yibOverallEngagement,
+  yibTopUserHourDay,
   yibTotalSetRetailValue,
   yibUserBadges,
   yibUserTopLocations,
@@ -167,6 +168,12 @@ interface YearInBricks {
       countryCode: string;
       vendorSets: number;
       totalPrice: number;
+    };
+    byDayHour?: {
+      topHour12: string;
+      topHour24: string;
+      topDayOfWeek: string;
+      count: number;
     };
   };
   places?: {
@@ -398,6 +405,12 @@ const getYearInBricksReview = async ({
         yibTotalSetRetailValue(userId, startDate, endDate)
       );
 
+      const topDayHour = await prisma.$queryRawTyped(
+        yibTopUserHourDay(userId, startDate, endDate)
+      );
+
+      console.log(topDayHour);
+
       yearinBricks.numbers = {
         addedToList: Number(item.total_sets_added),
 
@@ -422,6 +435,14 @@ const getYearInBricksReview = async ({
             currency: setValue[0].currency,
             countryCode: setValue[0].countryCode,
             totalPrice: Number(setValue[0].totalPrice),
+          },
+        }),
+        ...(topDayHour.length !== 0 && {
+          byDayHour: {
+            topDayOfWeek: topDayHour[0].top_day_of_week,
+            count: Number(topDayHour[0].hour_activity_count),
+            topHour12: topDayHour[0].hour_range_12,
+            topHour24: topDayHour[0].hour_range_24,
           },
         }),
       };
