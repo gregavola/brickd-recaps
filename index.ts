@@ -30,6 +30,7 @@ import {
   yibGetUserTopThemes,
   yibMinifiguresByUser,
   yibOverallEngagement,
+  yibTotalSetRetailValue,
   yibUserBadges,
   yibUserTopLocations,
   yibUserTotalMedia,
@@ -161,6 +162,12 @@ interface YearInBricks {
       setCount: number;
       pieceCount: number;
     }[];
+    setValue?: {
+      currency: string;
+      countryCode: string;
+      vendorSets: number;
+      totalPrice: number;
+    };
   };
   places?: {
     count: number;
@@ -387,6 +394,10 @@ const getYearInBricksReview = async ({
         yibGetSetsAndPieceCountByMonth(userId, startDate, endDate)
       );
 
+      const setValue = await prisma.$queryRawTyped(
+        yibTotalSetRetailValue(userId, startDate, endDate)
+      );
+
       yearinBricks.numbers = {
         addedToList: Number(item.total_sets_added),
 
@@ -405,6 +416,14 @@ const getYearInBricksReview = async ({
         }),
         piecesBuilt: Number(item.total_parts_built),
         global: globalStats,
+        ...(setValue.length !== 0 && {
+          setValue: {
+            vendorSets: Number(setValue[0].vendorSets),
+            currency: setValue[0].currency,
+            countryCode: setValue[0].countryCode,
+            totalPrice: Number(setValue[0].totalPrice),
+          },
+        }),
       };
     }
   }

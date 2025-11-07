@@ -29,6 +29,7 @@ WITH
             uci."userId" = $1
             AND uc."isTestingCollection" = 0
             AND ucic."buildStatus" = 'BUILT'
+            and uc."collectionType" = 'SETS'
             AND ucic."builtDate" IS NOT NULL
             AND (
                 (ucic."builtDate" AT TIME ZONE 'UTC') AT TIME ZONE b.tz
@@ -51,6 +52,7 @@ WITH
             uci."userId" = $1
             AND uc."isTestingCollection" = 0
             AND uci."buildStatus" = 'BUILT'
+            and uc."collectionType" = 'SETS'
             AND uci."builtDate" IS NOT NULL
             AND (
                 (uci."builtDate" AT TIME ZONE 'UTC') AT TIME ZONE b.tz
@@ -79,6 +81,7 @@ WITH
         WHERE
             uci."userId" = $1
             AND uc."isTestingCollection" = 0
+            and uc."collectionType" = 'SETS'
             AND (
                 cb.child_built_count IS NOT NULL
                 OR pb.uci_id IS NOT NULL
@@ -102,6 +105,7 @@ WITH
         WHERE
             uci."userId" = $1
             AND uc."isTestingCollection" = 0
+            and uc."collectionType" = 'SETS'
             AND COALESCE(uc."isWishList", 0) = 0 -- adjust column name/casing if needed
             AND (
                 (uci."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE b.tz
