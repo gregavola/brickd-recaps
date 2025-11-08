@@ -1727,7 +1727,7 @@ export const kickOffTasks = async ({
     return {
       reportId,
       createdAt: new Date(),
-      userId: subItem.userName,
+      userId: subItem.id,
       totalSets: Number(subItem.totalSets),
       totalMinifigs: Number(subItem.totalMinifigs),
     };
