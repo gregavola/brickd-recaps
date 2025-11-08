@@ -2563,7 +2563,7 @@ export const processYearInBricks = async ({
   sendEmail?: boolean;
   reportId: number;
   rebuild?: boolean;
-  logName?: string;
+  logName?: string | null;
 }) => {
   const data = await prisma.brickd_UserRecapReport.findFirst({
     where: { id: reportId },
@@ -2579,7 +2579,9 @@ export const processYearInBricks = async ({
     await prisma.brickd_UserRecapReportLog.update({
       data: {
         updatedAt: new Date(),
-        logName,
+        ...(logName && {
+          logName,
+        }),
         lambdaStartedAt: new Date(),
         status: "RUNNING",
       },
@@ -2819,7 +2821,7 @@ export const runOne = async (event: any, context?: Context) => {
   console.log(`Event: ${JSON.stringify(event, null, 2)}`);
   console.log(`Context: ${JSON.stringify(context, null, 2)}`);
 
-  let logStreamName: string | undefined = undefined;
+  let logStreamName: string | null = null;
 
   if (context.logStreamName) {
     logStreamName = context.logStreamName;
@@ -2948,6 +2950,7 @@ export const runOne = async (event: any, context?: Context) => {
 export const handler = async (event: any, context?: Context): Promise<any> => {
   console.log("🚧 [DEBUG] 🟢 - Start");
   console.log(`Event: ${JSON.stringify(event, null, 2)}`);
+  console.log(`Context: ${JSON.stringify(context, null, 2)}`);
 
   if (isSqsEvent(event)) {
     console.log(`SQS EVENT`);
@@ -2957,7 +2960,7 @@ export const handler = async (event: any, context?: Context): Promise<any> => {
     for (const rec of event.Records) {
       try {
         const body = safeParse(rec.body);
-        await runOne(body); // runs one at a time, logs in order
+        await runOne(body, context); // runs one at a time, logs in order
       } catch (err) {
         console.error("Record failed:", rec.messageId, err);
         failures.push({ itemIdentifier: rec.messageId });
