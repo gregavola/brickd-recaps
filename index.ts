@@ -2317,6 +2317,7 @@ export const processRecap = async ({
   sendEmail,
   reportId,
   rebuild,
+  logName,
 }: {
   userId?: number;
   offset?: number;
@@ -2324,6 +2325,7 @@ export const processRecap = async ({
   sendEmail?: boolean;
   reportId: number;
   rebuild?: boolean;
+  logName?: string | null;
 }) => {
   const data = await prisma.brickd_UserRecapReport.findFirst({
     where: { id: reportId },
@@ -2356,6 +2358,22 @@ export const processRecap = async ({
 
   if (hasOffset) {
     console.log(`== OFFSET RUN for ${offset}===`);
+  }
+
+  if (logId) {
+    await prisma.brickd_UserRecapReportLog.update({
+      data: {
+        updatedAt: new Date(),
+        ...(logName && {
+          logName,
+        }),
+        lambdaStartedAt: new Date(),
+        status: "RUNNING",
+      },
+      where: {
+        id: logId,
+      },
+    });
   }
 
   const results =
@@ -2418,6 +2436,18 @@ export const processRecap = async ({
 
   let recap: any | null = null;
   let offsetValue: number = offset || 0;
+
+  if (logId) {
+    await prisma.brickd_UserRecapReportLog.update({
+      data: {
+        updatedAt: new Date(),
+        totalUsers: results.length,
+      },
+      where: {
+        id: logId,
+      },
+    });
+  }
 
   const dateKey = startDate.format("MM_YY");
 
@@ -2928,6 +2958,7 @@ export const runOne = async (event: any, context?: Context) => {
           logId,
           rebuild,
           offset,
+          logName: logStreamName,
         });
       } else {
         await processRecap({ offset: offset || 0, logId, reportId, rebuild });
