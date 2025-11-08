@@ -1713,6 +1713,16 @@ export const kickOffTasks = async ({
 
   console.log(`Total Users: ${results.length}`);
 
+  await prisma.brickd_UserRecapReport.update({
+    data: {
+      totalUsers: results.length,
+      updatedAt: new Date(),
+    },
+    where: {
+      id: reportId,
+    },
+  });
+
   // 100 Per Job, that's Fine 🤷‍♂️
   const offsetKey = 100;
 
@@ -2649,6 +2659,18 @@ export const processYearInBricks = async ({
     startDate: startDate.toDate(),
     endDate: endDate.toDate(),
   });
+
+  if (logId) {
+    await prisma.brickd_UserRecapReportLog.update({
+      data: {
+        updatedAt: new Date(),
+        totalUsers: results.length,
+      },
+      where: {
+        id: logId,
+      },
+    });
+  }
 
   console.log(`Global Stats`);
   console.log(JSON.stringify(globalStats));
