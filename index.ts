@@ -1715,7 +1715,8 @@ export const kickOffTasks = async ({
 
   console.log(`Total Users: ${results.length}`);
 
-  const offsetKey = data.isYIB === 1 ? 300 : 100;
+  // 100 Per Job, that's Fine 🤷‍♂️
+  const offsetKey = 100;
 
   const totalPages = Math.ceil(results.length / offsetKey);
 
