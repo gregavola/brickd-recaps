@@ -2566,7 +2566,7 @@ export const processRecap = async ({
     const count = await prisma.brickd_UserRecapReportLog.count({
       where: {
         reportId,
-        offset: { gt: offset },
+        status: { not: "COMPLETE" },
       },
     });
 
@@ -2809,7 +2809,7 @@ export const processYearInBricks = async ({
   const count = await prisma.brickd_UserRecapReportLog.count({
     where: {
       reportId,
-      offset: { gt: offset },
+      status: { not: "COMPLETE" },
     },
   });
 
