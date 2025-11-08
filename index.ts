@@ -350,8 +350,6 @@ const getYearInBricksReview = async ({
     },
   });
 
-  console.log(`Start: ${new Date().toISOString()}`);
-
   if (!timeZone) {
     throw new Error("User Not Found");
   }
@@ -2467,8 +2465,6 @@ export const processRecap = async ({
       },
     });
 
-    console.log(`Recap: ${id ? "YES" : "NO"}`);
-
     if (!id) {
       const response = await prisma.brickd_UserRecap.create({
         data: {
@@ -2655,7 +2651,6 @@ export const processYearInBricks = async ({
   console.log(`Global Stats`);
   console.log(JSON.stringify(globalStats));
 
-  let recap: any | null = null;
   let offsetValue: number = offset || 0;
   let masterTime: number, masterEndTime: number;
 
@@ -2665,10 +2660,8 @@ export const processYearInBricks = async ({
     const now = performance.now();
 
     console.log(
-      `--- Starting with ${user.userName} - ${user.totalSets} YIB ----`
+      `=== [${user.id}] Starting with ${user.userName} - ${user.totalSets} (YIB) ===`
     );
-
-    console.log(`Start with Query: ${new Date().toISOString()}`);
 
     const start = performance.now();
 
@@ -2678,8 +2671,6 @@ export const processYearInBricks = async ({
       end: endDate.toISOString(),
       stats: globalStats,
     });
-
-    recap = data;
 
     const mediaKey = `${yibYear}/${user.uuid}.json`;
 
@@ -2730,7 +2721,6 @@ export const processYearInBricks = async ({
 
       recapId = response.id;
     } else {
-      console.log("UPDATING");
       recapId = id.id;
       await prisma.brickd_YearInBrickUser.updateMany({
         data: {
@@ -2760,6 +2750,7 @@ export const processYearInBricks = async ({
 
     offsetValue++;
   }
+
   masterEndTime = performance.now();
 
   if (logId) {
@@ -2912,6 +2903,7 @@ export const runOne = async (event: any, context?: Context) => {
           reportId,
           logId,
           rebuild,
+          offset,
         });
       } else {
         await processRecap({ offset: offset || 0, logId, reportId, rebuild });
