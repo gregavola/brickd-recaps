@@ -38,7 +38,6 @@ WHERE
         a."totalMinifigs" >= 2
         OR a."totalSets" >= 5
     )
-    AND ur.id IS NULL
 ORDER BY
     a.id ASC
 OFFSET

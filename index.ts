@@ -2765,6 +2765,7 @@ export const processYearInBricks = async ({
           userId: Number(user.id),
           reportId,
           itemCount: Number(user.totalSets),
+          updatedAt: new Date(),
           timeTaken: parseFloat(timeDiff),
           createdAt: new Date(),
           collectionCount: 0,
