@@ -5,9 +5,7 @@ import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import {
   getAudienceCount,
-  getAudienceForMonthlyRecaps,
   getAudienceForMonthlyRecapsWithOffset,
-  getAudienceForMonthlyRecapsWithOffsetRebuild,
   getAudienceForMonthlyRecapTest,
   getGlobalBuiltStats,
   getTopUserActivity,
@@ -22,10 +20,8 @@ import {
   getUserTopThemes,
   yibBigNumbersByUser,
   yibDiscussionEngagement,
-  yibGetAudience,
   yibGetAudienceTest,
   yibGetAudienceWithOffset,
-  yibGetAudienceWithOffsetRebuild,
   yibGetSetsAndPieceCountByMonth,
   yibGetUserTopThemes,
   yibMinifiguresByUser,
@@ -40,17 +36,11 @@ import {
 import prisma from "./db";
 import s3 from "./s3";
 import sqs from "./sqs";
-import lambdaClient from "./lambda";
 import {
   GetObjectCommand,
   ObjectCannedACL,
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
-import {
-  InvokeCommand,
-  InvokeCommandInput,
-  InvokeCommandOutput,
-} from "@aws-sdk/client-lambda";
 import { LoopsClient } from "loops";
 import {
   CollectionItemMediaType,
@@ -325,6 +315,16 @@ const getCloudFrontSetImage = (
   }
 
   return `https://d1vkkzx0dvroko.cloudfront.net/${setNumber}/main.jpg`;
+};
+
+export const chunk = (arr: Array<any>, chunkSize: number) => {
+  const chunks = [];
+  for (let i = 0; i < arr.length; i += chunkSize) {
+    const chunk = arr.slice(i, i + chunkSize);
+    chunks.push(chunk);
+  }
+
+  return chunks;
 };
 
 const getYearInBricksReview = async ({
@@ -1723,6 +1723,22 @@ export const kickOffTasks = async ({
     },
   });
 
+  const dataInsert = results.map((subItem) => {
+    return {
+      reportId,
+      createdAt: new Date(),
+      userId: subItem.userName,
+      totalSets: Number(subItem.totalSets),
+      totalMinifigs: Number(subItem.totalMinifigs),
+    };
+  });
+
+  const chunks = chunk(dataInsert, 300);
+
+  for await (const chunk of chunks) {
+    await prisma.brickd_UserRecapReportAudience.createMany({ data: chunk });
+  }
+
   // 100 Per Job, that's Fine 🤷‍♂️
   const offsetKey = 100;
 
@@ -2376,42 +2392,23 @@ export const processRecap = async ({
     });
   }
 
-  const results =
-    rebuild && hasOffset
-      ? await prisma.$queryRawTyped(
-          getAudienceForMonthlyRecapsWithOffsetRebuild(
-            startDate.toDate(),
-            endDate.toDate(),
-            offset!,
-            100
-          )
+  if (!userId && !hasOffset) {
+    console.log("Missing UserId or Offset");
+    return;
+  }
+
+  const results = hasOffset
+    ? await prisma.$queryRawTyped(
+        getAudienceForMonthlyRecapsWithOffset(reportId, offset!, 100)
+      )
+    : await prisma.$queryRawTyped(
+        getAudienceForMonthlyRecapTest(
+          startDate.toDate(),
+          endDate.toDate(),
+          reportId,
+          userId
         )
-      : hasOffset
-      ? await prisma.$queryRawTyped(
-          getAudienceForMonthlyRecapsWithOffset(
-            startDate.toDate(),
-            endDate.toDate(),
-            reportId,
-            offset!,
-            100
-          )
-        )
-      : userId
-      ? await prisma.$queryRawTyped(
-          getAudienceForMonthlyRecapTest(
-            startDate.toDate(),
-            endDate.toDate(),
-            reportId,
-            userId
-          )
-        )
-      : await prisma.$queryRawTyped(
-          getAudienceForMonthlyRecaps(
-            startDate.toDate(),
-            endDate.toDate(),
-            reportId
-          )
-        );
+      );
 
   const globalStats = await getMonthlyStats({
     startDate: startDate.toDate(),
@@ -2457,7 +2454,7 @@ export const processRecap = async ({
     const now = performance.now();
 
     console.log(
-      `--- Starting with ${user.userName} - ${user.totalSets} sets ----`
+      `== [${user.userId}] Starting with ${user.userName} - ${user.totalSets} sets ===`
     );
 
     console.log(`Start with Query: ${new Date().toISOString()}`);
@@ -2465,7 +2462,7 @@ export const processRecap = async ({
     const start = performance.now();
 
     const data = await getUserRecaps({
-      userId: user.id,
+      userId: user.userId,
       start: startDate.toISOString(),
       end: endDate.toISOString(),
       stats: globalStats,
@@ -2500,7 +2497,7 @@ export const processRecap = async ({
 
     const id = await prisma.brickd_UserRecap.findFirst({
       where: {
-        userId: user.id,
+        userId: user.userId,
         reportDate: startDate.toDate(),
       },
     });
@@ -2508,7 +2505,7 @@ export const processRecap = async ({
     if (!id) {
       const response = await prisma.brickd_UserRecap.create({
         data: {
-          userId: user.id,
+          userId: user.userId,
           reportDate: startDate.toDate(),
           reportId,
           timeTaken: parseFloat(timeDiff),
@@ -2530,13 +2527,13 @@ export const processRecap = async ({
         },
         where: {
           id: id.id,
-          userId: user.id,
+          userId: user.userId,
         },
       });
     }
 
     if (sendEmail) {
-      await sendSingleEmail({ userId: user.id, recapId });
+      await sendSingleEmail({ userId: user.userId, recapId });
     }
 
     if (logId && offsetValue) {
@@ -2652,38 +2649,23 @@ export const processYearInBricks = async ({
     console.log(`== OFFSET RUN for ${offset}===`);
   }
 
-  const results =
-    rebuild && hasOffset
-      ? await prisma.$queryRawTyped(
-          yibGetAudienceWithOffsetRebuild(
-            startDate.toDate(),
-            endDate.toDate(),
-            offset!,
-            100
-          )
+  if (!hasOffset && !userId) {
+    console.log(`Missing Offset or UserId`);
+    return null;
+  }
+
+  const results = hasOffset
+    ? await prisma.$queryRawTyped(
+        yibGetAudienceWithOffset(reportId, offset!, 100)
+      )
+    : await prisma.$queryRawTyped(
+        yibGetAudienceTest(
+          startDate.toDate(),
+          endDate.toDate(),
+          reportId,
+          userId
         )
-      : hasOffset
-      ? await prisma.$queryRawTyped(
-          yibGetAudienceWithOffset(
-            startDate.toDate(),
-            endDate.toDate(),
-            reportId,
-            offset!,
-            100
-          )
-        )
-      : userId
-      ? await prisma.$queryRawTyped(
-          yibGetAudienceTest(
-            startDate.toDate(),
-            endDate.toDate(),
-            reportId,
-            userId
-          )
-        )
-      : await prisma.$queryRawTyped(
-          yibGetAudience(startDate.toDate(), endDate.toDate(), reportId)
-        );
+      );
 
   const globalStats = await getMonthlyStats({
     startDate: startDate.toDate(),
@@ -2714,13 +2696,13 @@ export const processYearInBricks = async ({
     const now = performance.now();
 
     console.log(
-      `=== [${user.id}] Starting with ${user.userName} - ${user.totalSets} (YIB) ===`
+      `=== [${user.userId}] Starting with ${user.userName} - ${user.totalSets} (YIB) ===`
     );
 
     const start = performance.now();
 
     const data = await getYearInBricksReview({
-      userId: user.id,
+      userId: user.userId,
       start: startDate.toISOString(),
       end: endDate.toISOString(),
       stats: globalStats,
@@ -2750,7 +2732,7 @@ export const processYearInBricks = async ({
 
     const id = await prisma.brickd_YearInBrickUser.findFirst({
       where: {
-        userId: user.id,
+        userId: user.userId,
         reportId,
       },
     });
@@ -2762,7 +2744,7 @@ export const processYearInBricks = async ({
     if (!id) {
       const response = await prisma.brickd_YearInBrickUser.create({
         data: {
-          userId: Number(user.id),
+          userId: Number(user.userId),
           reportId,
           itemCount: Number(user.totalSets),
           updatedAt: new Date(),
@@ -2786,7 +2768,7 @@ export const processYearInBricks = async ({
         },
         where: {
           id: id.id,
-          userId: user.id,
+          userId: user.userId,
         },
       });
     }

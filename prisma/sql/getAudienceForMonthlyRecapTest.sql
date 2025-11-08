@@ -1,7 +1,7 @@
 WITH
     audience AS (
         SELECT
-            "brickd"."brickd_User"."id",
+            "brickd"."brickd_User"."id" as "userId",
             "brickd"."brickd_User"."uuid",
             "brickd"."brickd_User"."userName",
             (
@@ -33,7 +33,7 @@ SELECT
     a.*
 FROM
     audience a
-    LEFT JOIN "brickd"."brickd_UserRecap" ur ON ur."userId" = a.id
+    LEFT JOIN "brickd"."brickd_UserRecap" ur ON ur."userId" = a."userId"
     AND ur."reportId" = $3
 WHERE
     (
@@ -41,4 +41,4 @@ WHERE
         OR a."totalSets" >= 5
     )
 ORDER BY
-    a.id ASC;
+    a."userId" ASC;
