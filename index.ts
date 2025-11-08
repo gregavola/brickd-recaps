@@ -3015,6 +3015,20 @@ export const handler = async (event: any, context?: Context): Promise<any> => {
       return result; // direct invoke
     } catch (err: any) {
       console.error(err);
+
+      if (payload.reportId) {
+        await prisma.brickd_UserRecapReport.update({
+          data: {
+            status: "ERROR",
+            error: err.message,
+            updatedAt: new Date(),
+          },
+          where: {
+            id: payload.reportId,
+          },
+        });
+      }
+
       throw err; // let direct invoke surface the error
     }
   }
