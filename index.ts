@@ -1856,27 +1856,50 @@ export const sendEmails = async ({ reportId }: { reportId: number }) => {
     },
   });
 
-  const users = await prisma.brickd_UserRecap.findMany({
-    select: {
-      id: true,
-      uuid: true,
-      dataUrl: true,
-      reportDate: true,
-      user: {
-        select: {
-          userName: true,
-          uuid: true,
-          enableCommunicationEmails: true,
-        },
-      },
-    },
-    where: {
-      reportId,
-      status: "QUEUED",
-      emailResponse: null,
-    },
-    orderBy: { userId: "asc" },
-  });
+  const users =
+    isYIB === 1
+      ? await prisma.brickd_YearInBrickUser.findMany({
+          select: {
+            id: true,
+            uuid: true,
+            dataUrl: true,
+            createdAt: true,
+            user: {
+              select: {
+                userName: true,
+                uuid: true,
+                enableCommunicationEmails: true,
+              },
+            },
+          },
+          where: {
+            reportId,
+            status: "QUEUED",
+            emailResponse: null,
+          },
+          orderBy: { userId: "asc" },
+        })
+      : await prisma.brickd_UserRecap.findMany({
+          select: {
+            id: true,
+            uuid: true,
+            dataUrl: true,
+            reportDate: true,
+            user: {
+              select: {
+                userName: true,
+                uuid: true,
+                enableCommunicationEmails: true,
+              },
+            },
+          },
+          where: {
+            reportId,
+            status: "QUEUED",
+            emailResponse: null,
+          },
+          orderBy: { userId: "asc" },
+        });
 
   console.log(`Size: ${users.length}`);
 
@@ -1935,37 +1958,18 @@ export const sendEmails = async ({ reportId }: { reportId: number }) => {
           });
         }
       } else {
-        const recap = await getUserRecapS3({
-          key: user.dataUrl,
-        });
+        if (isYIB === 1) {
+          if (user.user) {
+            const results = await sendLoopsEvent({
+              userId: user.user.uuid,
+              eventName: "yib-2025",
+              properties: {
+                url: `https://getbrickd.com/yearinbricks/2025`,
+              },
+            });
 
-        if (user.user && recap.data) {
-          const results = await sendLoopsEvent({
-            userId: user.user.uuid,
-            eventName: isYIB === 1 ? "yib-recap" : "monthly-recaps",
-            properties:
-              isYIB === 1
-                ? {
-                    yibYear: data.yibYear,
-                  }
-                : {
-                    totalSets: recap.data?.stories.sets.totalSetsAdded,
-                    dateHeader: dayjs
-                      .utc(recap.data?.reportDate)
-                      .format("MMMM YYYY"),
-                    piecesBuilt: recap.data.stories.sets.totalPieceCount,
-                    totalMinifigures:
-                      recap.data.stories.minifigs.totalMinifigsAdded,
-                    setsBuilt: recap.data?.stories.sets.totalSetsBuilt,
-                    recapUrl: `https://getbrickd.com/user-recaps/${user.uuid}?utm_source=email`,
-                  },
-          });
-
-          if (results) {
-            if (results.success) {
-              const end = performance.now();
-
-              if (isYIB === 1) {
+            if (results) {
+              if (results.success) {
                 await prisma.brickd_YearInBrickUser.updateMany({
                   data: {
                     status: "COMPLETE",
@@ -1979,47 +1983,20 @@ export const sendEmails = async ({ reportId }: { reportId: number }) => {
                   },
                 });
               } else {
-                await prisma.brickd_UserRecap.update({
+                await prisma.brickd_YearInBrickUser.updateMany({
                   data: {
-                    status: "COMPLETE",
+                    status: "ERROR",
                     emailResponse: JSON.stringify(results),
-                    emailTimeTaken: end - now,
+                    updatedAt: new Date(),
                     emailSentAt: new Date(),
                   },
                   where: {
-                    id: user.id,
+                    reportId,
+                    userId: user.id,
                   },
                 });
               }
             } else {
-              if (isYIB === 1) {
-                await prisma.brickd_YearInBrickUser.updateMany({
-                  data: {
-                    status: "ERROR",
-                    emailResponse: JSON.stringify(results),
-                    updatedAt: new Date(),
-                    emailSentAt: new Date(),
-                  },
-                  where: {
-                    reportId,
-                    userId: user.id,
-                  },
-                });
-              } else {
-                await prisma.brickd_UserRecap.update({
-                  data: {
-                    status: "ERROR",
-                    emailResponse: JSON.stringify(results),
-                    emailSentAt: new Date(),
-                  },
-                  where: {
-                    id: user.id,
-                  },
-                });
-              }
-            }
-          } else {
-            if (isYIB === 1) {
               await prisma.brickd_YearInBrickUser.updateMany({
                 data: {
                   status: "ERROR",
@@ -2032,6 +2009,69 @@ export const sendEmails = async ({ reportId }: { reportId: number }) => {
                   userId: user.id,
                 },
               });
+            }
+          } else {
+            await prisma.brickd_YearInBrickUser.updateMany({
+              data: {
+                status: "ERROR",
+                emailResponse: "invaid user",
+                updatedAt: new Date(),
+              },
+              where: {
+                reportId,
+                userId: user.id,
+              },
+            });
+          }
+        } else {
+          const recap = await getUserRecapS3({
+            key: user.dataUrl,
+          });
+
+          if (user.user && recap.data) {
+            const results = await sendLoopsEvent({
+              userId: user.user.uuid,
+              eventName: "monthly-recaps",
+              properties: {
+                totalSets: recap.data?.stories.sets.totalSetsAdded,
+                dateHeader: dayjs
+                  .utc(recap.data?.reportDate)
+                  .format("MMMM YYYY"),
+                piecesBuilt: recap.data.stories.sets.totalPieceCount,
+                totalMinifigures:
+                  recap.data.stories.minifigs.totalMinifigsAdded,
+                setsBuilt: recap.data?.stories.sets.totalSetsBuilt,
+                recapUrl: `https://getbrickd.com/user-recaps/${user.uuid}?utm_source=email`,
+              },
+            });
+
+            if (results) {
+              if (results.success) {
+                const end = performance.now();
+
+                await prisma.brickd_UserRecap.update({
+                  data: {
+                    status: "COMPLETE",
+                    emailResponse: JSON.stringify(results),
+                    emailTimeTaken: end - now,
+                    emailSentAt: new Date(),
+                  },
+                  where: {
+                    id: user.id,
+                  },
+                });
+              } else {
+                await prisma.brickd_UserRecap.update({
+                  data: {
+                    status: "ERROR",
+                    emailResponse: JSON.stringify(results),
+                    emailSentAt: new Date(),
+                  },
+                  where: {
+                    id: user.id,
+                  },
+                });
+              }
             } else {
               await prisma.brickd_UserRecap.update({
                 data: {
@@ -2044,20 +2084,6 @@ export const sendEmails = async ({ reportId }: { reportId: number }) => {
                 },
               });
             }
-          }
-        } else {
-          if (isYIB === 1) {
-            await prisma.brickd_YearInBrickUser.updateMany({
-              data: {
-                status: "ERROR",
-                emailResponse: "invaid user or recap.data",
-                updatedAt: new Date(),
-              },
-              where: {
-                reportId,
-                userId: user.id,
-              },
-            });
           } else {
             await prisma.brickd_UserRecap.update({
               data: {
