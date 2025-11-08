@@ -2774,6 +2774,26 @@ export const processYearInBricks = async ({
     });
   }
 
+  const count = await prisma.brickd_UserRecapReportLog.count({
+    where: {
+      reportId,
+      offset: { gt: offset },
+    },
+  });
+
+  if (count === 0) {
+    await prisma.brickd_UserRecapReport.update({
+      data: {
+        status: "COMPLETE",
+        endTime: new Date(),
+        updatedAt: new Date(),
+      },
+      where: {
+        id: reportId,
+      },
+    });
+  }
+
   if (logId && offset) {
     console.log(`${offset} 🟢 Complete`);
   }
