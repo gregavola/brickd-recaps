@@ -2559,6 +2559,7 @@ export const processYearInBricks = async ({
   sendEmail,
   reportId,
   rebuild,
+  logName,
 }: {
   userId?: number;
   offset?: number;
@@ -2566,6 +2567,7 @@ export const processYearInBricks = async ({
   sendEmail?: boolean;
   reportId: number;
   rebuild?: boolean;
+  logName?: string;
 }) => {
   const data = await prisma.brickd_UserRecapReport.findFirst({
     where: { id: reportId },
@@ -2581,7 +2583,8 @@ export const processYearInBricks = async ({
     await prisma.brickd_UserRecapReportLog.update({
       data: {
         updatedAt: new Date(),
-        endTime: new Date(),
+        logName,
+        lambdaStartedAt: new Date(),
         status: "RUNNING",
       },
       where: {
@@ -2825,6 +2828,12 @@ export const runOne = async (event: any, context?: Context) => {
   console.log(`Event: ${JSON.stringify(event, null, 2)}`);
   console.log(`Context: ${JSON.stringify(context, null, 2)}`);
 
+  let logStreamName: string | undefined = undefined;
+
+  if (context.logStreamName) {
+    logStreamName = context.logStreamName;
+  }
+
   const {
     userId,
     batch,
@@ -2877,6 +2886,7 @@ export const runOne = async (event: any, context?: Context) => {
         userId: event.userId,
         reportId: reportData.id,
         logId: null,
+        logName: logStreamName,
       });
     } else {
       await processRecap({
