@@ -2975,7 +2975,7 @@ export const handler = async (event: any, context?: Context): Promise<any> => {
     // API / manual path
     const payload = parseApiPayload(event);
     try {
-      const result = await runOne(payload);
+      const result = await runOne(payload, context);
       return result; // direct invoke
     } catch (err: any) {
       console.error(err);
