@@ -2589,24 +2589,26 @@ export const processRecap = async ({
       },
     });
 
-    const count = await prisma.brickd_UserRecapReportLog.count({
-      where: {
-        reportId,
-        status: { not: "COMPLETE" },
-      },
-    });
-
-    if (count === 0) {
-      await prisma.brickd_UserRecapReport.update({
-        data: {
-          status: "COMPLETE",
-          endTime: new Date(),
-          updatedAt: new Date(),
-        },
+    if (hasOffset) {
+      const count = await prisma.brickd_UserRecapReportLog.count({
         where: {
-          id: reportId,
+          reportId,
+          offset: { gt: offset },
         },
       });
+
+      if (count === 0) {
+        await prisma.brickd_UserRecapReport.update({
+          data: {
+            status: "COMPLETE",
+            endTime: new Date(),
+            updatedAt: new Date(),
+          },
+          where: {
+            id: reportId,
+          },
+        });
+      }
     }
   }
 };
@@ -2832,24 +2834,26 @@ export const processYearInBricks = async ({
     });
   }
 
-  const count = await prisma.brickd_UserRecapReportLog.count({
-    where: {
-      reportId,
-      status: { not: "COMPLETE" },
-    },
-  });
-
-  if (count === 0) {
-    await prisma.brickd_UserRecapReport.update({
-      data: {
-        status: "COMPLETE",
-        endTime: new Date(),
-        updatedAt: new Date(),
-      },
+  if (hasOffset) {
+    const count = await prisma.brickd_UserRecapReportLog.count({
       where: {
-        id: reportId,
+        reportId,
+        offset: { gt: offset },
       },
     });
+
+    if (count === 0) {
+      await prisma.brickd_UserRecapReport.update({
+        data: {
+          status: "COMPLETE",
+          endTime: new Date(),
+          updatedAt: new Date(),
+        },
+        where: {
+          id: reportId,
+        },
+      });
+    }
   }
 
   if (logId && offset) {
