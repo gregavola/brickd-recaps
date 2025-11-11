@@ -2888,7 +2888,7 @@ export const runOne = async (event: any, context?: Context) => {
 
   let logStreamName: string | null = null;
 
-  if (context.logStreamName) {
+  if (context && context.logGroupName) {
     logStreamName = context.logStreamName;
   }
 
