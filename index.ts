@@ -2729,6 +2729,37 @@ export const processYearInBricks = async ({
 
     const start = performance.now();
 
+    let recapId: number | null = null;
+    let recapUuid: string | null = null;
+
+    const id = await prisma.brickd_YearInBrickUser.findFirst({
+      where: {
+        userId: user.userId,
+        reportId,
+      },
+    });
+
+    if (!id) {
+      const response = await prisma.brickd_YearInBrickUser.create({
+        data: {
+          userId: Number(user.userId),
+          reportId,
+          itemCount: Number(user.totalSets),
+          updatedAt: new Date(),
+          createdAt: new Date(),
+          collectionCount: 0,
+          dataUrlStatus: 0,
+          dataUrl: null,
+        },
+      });
+
+      recapId = response.id;
+      recapUuid = response.uuid;
+    } else {
+      recapId = id.id;
+      recapUuid = id.uuid;
+    }
+
     const data = await getYearInBricksReview({
       userId: user.userId,
       start: startDate.toISOString(),
@@ -2737,6 +2768,8 @@ export const processYearInBricks = async ({
     });
 
     const mediaKey = `${yibYear}/${user.uuid}.json`;
+
+    data.uuid = recapUuid;
 
     console.log(`Done with Query: ${new Date().toISOString()}`);
 
@@ -2758,48 +2791,20 @@ export const processYearInBricks = async ({
 
     console.log(`Full Time: ${timeDiff}ms`);
 
-    const id = await prisma.brickd_YearInBrickUser.findFirst({
-      where: {
-        userId: user.userId,
-        reportId,
-      },
-    });
-
-    let recapId: number | null = null;
-
     console.log(`Recap: ${id ? "YES" : "NO"}`);
 
-    if (!id) {
-      const response = await prisma.brickd_YearInBrickUser.create({
-        data: {
-          userId: Number(user.userId),
-          reportId,
-          itemCount: Number(user.totalSets),
-          updatedAt: new Date(),
-          timeTaken: parseFloat(timeDiff),
-          createdAt: new Date(),
-          collectionCount: 0,
-          dataUrlStatus: 200,
-          dataUrl: `https://brickd-yib.s3.amazonaws.com/${mediaKey}`,
-        },
-      });
-
-      recapId = response.id;
-    } else {
-      recapId = id.id;
-      await prisma.brickd_YearInBrickUser.updateMany({
-        data: {
-          updatedAt: new Date(),
-          itemCount: Number(user.totalSets),
-          dataUrl: `https://brickd-yib.s3.amazonaws.com/${mediaKey}`,
-          timeTaken: parseFloat(timeDiff),
-        },
-        where: {
-          id: id.id,
-          userId: user.userId,
-        },
-      });
-    }
+    await prisma.brickd_YearInBrickUser.updateMany({
+      data: {
+        updatedAt: new Date(),
+        itemCount: Number(user.totalSets),
+        dataUrl: `https://brickd-yib.s3.amazonaws.com/${mediaKey}`,
+        timeTaken: parseFloat(timeDiff),
+      },
+      where: {
+        id: recapId,
+        userId: user.userId,
+      },
+    });
 
     if (logId && offsetValue) {
       await prisma.brickd_UserRecapReportLog.update({
