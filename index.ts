@@ -1857,16 +1857,6 @@ export const kickOffEmails = async ({ reportId }: { reportId: number }) => {
 
   console.log(`Total Users: ${results[0].totalCount}`);
 
-  await prisma.brickd_UserRecapReport.update({
-    data: {
-      totalUsers: results[0].totalCount,
-      updatedAt: new Date(),
-    },
-    where: {
-      id: reportId,
-    },
-  });
-
   // 100 Per Job, that's Fine 🤷‍♂️
   const offsetKey = 100;
 
@@ -3192,7 +3182,7 @@ export const runOne = async (event: any, context?: Context) => {
     if (!reportId) {
       console.error(`Missing Report ID`);
     } else {
-      console.log("== KICK OFF TASKS ===");
+      console.log("== KICK OFF TASKS (EMAIL) ===");
       await kickOffEmails({ reportId });
     }
   } else {
