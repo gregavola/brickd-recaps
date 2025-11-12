@@ -1855,12 +1855,14 @@ export const kickOffEmails = async ({ reportId }: { reportId: number }) => {
     console.log(`=== Year in Bricks for ${yibYear} ===`);
   }
 
-  console.log(`Total Users: ${results[0].totalCount}`);
+  const totalUsers = Number(results[0].totalCount);
+
+  console.log(`Total Users: ${totalUsers}`);
 
   // 100 Per Job, that's Fine 🤷‍♂️
   const offsetKey = 100;
 
-  const totalPages = Math.ceil(results[0].totalCount / offsetKey);
+  const totalPages = Math.ceil(totalUsers / offsetKey);
 
   const pagesArray: number[] = [];
 
