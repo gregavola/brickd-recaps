@@ -2453,10 +2453,12 @@ export const createRecapReport = async ({
   reportDate,
   isYIB,
   yibYear,
+  loopsId,
 }: {
   reportDate: Date | string;
   isYIB: number;
   yibYear: number | null;
+  loopsId: string;
 }) => {
   await prisma.brickd_UserRecapReport.create({
     data: {
@@ -2464,6 +2466,7 @@ export const createRecapReport = async ({
       reportDate,
       isYIB,
       yibYear,
+      loopsId,
       status: "QUEUED",
     },
   });
@@ -3078,6 +3081,7 @@ export const runOne = async (event: any, context?: Context) => {
     reportId,
     isYIB,
     yibYear,
+    loopsId,
   }: {
     userId?: number;
     incremental?: boolean;
@@ -3091,6 +3095,7 @@ export const runOne = async (event: any, context?: Context) => {
     logId?: number;
     isYIB?: number;
     yibYear?: number;
+    loopsId: string;
   } = event;
 
   console.log(`This is batch: ${batch}`);
@@ -3100,6 +3105,7 @@ export const runOne = async (event: any, context?: Context) => {
       reportDate,
       isYIB: isYIB || 0,
       yibYear: yibYear || null,
+      loopsId,
     });
   } else if (userId) {
     console.log(`== SINGLE ${userId} ===`);
@@ -3177,7 +3183,7 @@ export const runOne = async (event: any, context?: Context) => {
     }
 
     if (!offset) {
-      throw new Error("Missing Missing");
+      throw new Error("Offset Missing");
     }
 
     console.log("== Email ===");
