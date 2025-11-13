@@ -7,6 +7,8 @@ import {
   getAudienceCount,
   getAudienceCountForUserRecaps,
   getAudienceCountForYearInBricks,
+  getAudienceForEmailForUserRecap,
+  getAudienceForEmailForYib,
   getAudienceForMonthlyRecapsWithOffset,
   getAudienceForMonthlyRecapTest,
   getGlobalBuiltStats,
@@ -26,6 +28,7 @@ import {
   yibGetAudienceWithOffset,
   yibGetSetsAndPieceCountByMonth,
   yibGetUserTopThemes,
+  yibLongestStreak,
   yibMinifiguresByUser,
   yibOverallEngagement,
   yibTopUserHourDay,
@@ -54,6 +57,22 @@ import { SendMessageCommand } from "@aws-sdk/client-sqs";
 import { Redis, SetCommandOptions } from "@upstash/redis";
 
 // types
+
+interface StreakData {
+  rank: number | null;
+  total: number;
+  updatedAt?: Date | string | null;
+  currentStreak: number;
+  longestStreak: number;
+  currentStreakDates: {
+    start: Date | null;
+    end: Date | null;
+  };
+  longestStreakDates: {
+    start: Date | null;
+    end: Date | null;
+  };
+}
 
 export interface Set {
   uuid: string;
@@ -170,6 +189,11 @@ interface YearInBricks {
       topDayOfWeek: string;
       count: number;
     };
+  };
+  streak?: {
+    longestStreak: number;
+    startDate: Date | string;
+    endDate: Date | string;
   };
   places?: {
     count: number;
@@ -466,6 +490,23 @@ const getYearInBricksReview = async ({
             topHour24: topDayHour[0].hour_range_24,
           },
         }),
+      };
+    }
+  }
+
+  // Streak
+  const streak = await prisma.$queryRawTyped(
+    yibLongestStreak(userId, startDate, endDate)
+  );
+
+  if (streak.length !== 0) {
+    const item = streak[0];
+
+    if (Number(item.longestStreak) >= 10) {
+      yearinBricks.streak = {
+        longestStreak: Number(item.longestStreak),
+        startDate: item.longestStreakStart,
+        endDate: item.longestStreakEnd,
       };
     }
   }
@@ -1977,52 +2018,12 @@ export const sendEmails = async ({
 
   const users =
     isYIB === 1
-      ? await prisma.brickd_YearInBrickUser.findMany({
-          select: {
-            id: true,
-            uuid: true,
-            dataUrl: true,
-            createdAt: true,
-            user: {
-              select: {
-                userName: true,
-                uuid: true,
-                enableCommunicationEmails: true,
-              },
-            },
-          },
-          where: {
-            reportId,
-            status: "QUEUED",
-            emailResponse: null,
-          },
-          take: 100,
-          skip: offset || 0,
-          orderBy: { userId: "asc" },
-        })
-      : await prisma.brickd_UserRecap.findMany({
-          select: {
-            id: true,
-            uuid: true,
-            dataUrl: true,
-            reportDate: true,
-            user: {
-              select: {
-                userName: true,
-                uuid: true,
-                enableCommunicationEmails: true,
-              },
-            },
-          },
-          where: {
-            reportId,
-            status: "QUEUED",
-            emailResponse: null,
-          },
-          take: 100,
-          skip: offset || 0,
-          orderBy: { userId: "asc" },
-        });
+      ? await prisma.$queryRawTyped(
+          getAudienceForEmailForYib(reportId, offset, 100)
+        )
+      : await prisma.$queryRawTyped(
+          getAudienceForEmailForUserRecap(reportId, offset, 100)
+        );
 
   const reportLog = await prisma.brickd_UserRecapReportEmailLog.create({
     data: {
@@ -2044,217 +2045,217 @@ export const sendEmails = async ({
   mainStartTime = performance.now();
 
   for await (const user of users) {
-    console.log(`Starting with ${user.user?.userName || "Unknown"}`);
+    console.log(`Starting with ${user.userName || "Unknown"}`);
 
-    //const now = performance.now();
+    const now = performance.now();
 
-    // try {
-    //   if (isYIB === 1) {
-    //     await prisma.brickd_YearInBrickUser.updateMany({
-    //       data: {
-    //         status: "RUNNING",
-    //         updatedAt: new Date(),
-    //       },
-    //       where: {
-    //         reportId,
-    //         userId: user.id,
-    //       },
-    //     });
-    //   } else {
-    //     await prisma.brickd_UserRecap.update({
-    //       data: {
-    //         status: "RUNNING",
-    //         statusDate: new Date(),
-    //       },
-    //       where: {
-    //         uuid: user.uuid,
-    //       },
-    //     });
-    //   }
+    try {
+      if (isYIB === 1) {
+        await prisma.brickd_YearInBrickUser.updateMany({
+          data: {
+            status: "RUNNING",
+            updatedAt: new Date(),
+          },
+          where: {
+            reportId,
+            userId: user.id,
+          },
+        });
+      } else {
+        await prisma.brickd_UserRecap.update({
+          data: {
+            status: "RUNNING",
+            statusDate: new Date(),
+          },
+          where: {
+            uuid: user.uuid,
+          },
+        });
+      }
 
-    //   if (user.user.enableCommunicationEmails === 0) {
-    //     if (isYIB === 1) {
-    //       await prisma.brickd_YearInBrickUser.updateMany({
-    //         data: {
-    //           status: "COMPLETE",
-    //           emailResponse: JSON.stringify({ skipped: true }),
-    //           updatedAt: new Date(),
-    //         },
-    //         where: {
-    //           reportId,
-    //           userId: user.id,
-    //         },
-    //       });
-    //     } else {
-    //       await prisma.brickd_UserRecap.update({
-    //         data: {
-    //           status: "COMPLETE",
-    //           emailResponse: JSON.stringify({ skipped: true }),
-    //           statusDate: new Date(),
-    //         },
-    //         where: {
-    //           uuid: user.uuid,
-    //         },
-    //       });
-    //     }
-    //   } else {
-    //     if (isYIB === 1) {
-    //       if (user.user) {
-    //         const results = await sendLoopsEvent({
-    //           userId: user.user.uuid,
-    //           eventName: "yib-2025",
-    //           properties: {
-    //             url: `https://getbrickd.com/year-in-bricks/2025`,
-    //           },
-    //         });
+      if (user.enableCommunicationEmails === 0) {
+        if (isYIB === 1) {
+          await prisma.brickd_YearInBrickUser.updateMany({
+            data: {
+              status: "COMPLETE",
+              emailResponse: JSON.stringify({ skipped: true }),
+              updatedAt: new Date(),
+            },
+            where: {
+              reportId,
+              userId: user.id,
+            },
+          });
+        } else {
+          await prisma.brickd_UserRecap.update({
+            data: {
+              status: "COMPLETE",
+              emailResponse: JSON.stringify({ skipped: true }),
+              statusDate: new Date(),
+            },
+            where: {
+              uuid: user.uuid,
+            },
+          });
+        }
+      } else {
+        if (isYIB === 1) {
+          const results = await sendLoopsEvent({
+            userId: user.uuid,
+            eventName: "yib-2025",
+            properties: {
+              url: `https://getbrickd.com/year-in-bricks/2025`,
+            },
+          });
 
-    //         if (results && results.success) {
-    //           await prisma.brickd_YearInBrickUser.updateMany({
-    //             data: {
-    //               status: "COMPLETE",
-    //               emailResponse: JSON.stringify(results),
-    //               updatedAt: new Date(),
-    //               emailSentAt: new Date(),
-    //             },
-    //             where: {
-    //               reportId,
-    //               userId: user.id,
-    //             },
-    //           });
-    //         } else {
-    //           await prisma.brickd_YearInBrickUser.updateMany({
-    //             data: {
-    //               status: "ERROR",
-    //               emailResponse: JSON.stringify(results),
-    //               updatedAt: new Date(),
-    //               emailSentAt: new Date(),
-    //             },
-    //             where: {
-    //               reportId,
-    //               userId: user.id,
-    //             },
-    //           });
-    //         }
-    //       } else {
-    //         await prisma.brickd_YearInBrickUser.updateMany({
-    //           data: {
-    //             status: "ERROR",
-    //             emailResponse: "invaid user",
-    //             updatedAt: new Date(),
-    //           },
-    //           where: {
-    //             reportId,
-    //             userId: user.id,
-    //           },
-    //         });
-    //       }
-    //     } else {
-    //       const recap = await getUserRecapS3({
-    //         key: user.dataUrl,
-    //       });
+          if (results && results.success) {
+            await prisma.brickd_YearInBrickUser.updateMany({
+              data: {
+                status: "COMPLETE",
+                emailResponse: JSON.stringify(results),
+                updatedAt: new Date(),
+                emailSentAt: new Date(),
+              },
+              where: {
+                reportId,
+                userId: user.id,
+              },
+            });
+          } else {
+            await prisma.brickd_YearInBrickUser.updateMany({
+              data: {
+                status: "ERROR",
+                emailResponse: JSON.stringify(results),
+                updatedAt: new Date(),
+                emailSentAt: new Date(),
+              },
+              where: {
+                reportId,
+                userId: user.id,
+              },
+            });
+          }
+        } else {
+          const dataUrls = await prisma.brickd_UserRecap.findFirst({
+            select: {
+              dataUrl: true,
+            },
+            where: {
+              reportId,
+              userId: user.id,
+            },
+          });
 
-    //       if (user.user && recap.data) {
-    //         const results = await sendLoopsEvent({
-    //           userId: user.user.uuid,
-    //           eventName: "monthly-recaps",
-    //           properties: {
-    //             totalSets: recap.data?.stories.sets.totalSetsAdded,
-    //             dateHeader: dayjs
-    //               .utc(recap.data?.reportDate)
-    //               .format("MMMM YYYY"),
-    //             piecesBuilt: recap.data.stories.sets.totalPieceCount,
-    //             totalMinifigures:
-    //               recap.data.stories.minifigs.totalMinifigsAdded,
-    //             setsBuilt: recap.data?.stories.sets.totalSetsBuilt,
-    //             recapUrl: `https://getbrickd.com/user-recaps/${user.uuid}?utm_source=email`,
-    //           },
-    //         });
+          if (!dataUrls) {
+            return;
+          } else {
+            const recap = await getUserRecapS3({
+              key: dataUrls.dataUrl,
+            });
 
-    //         if (results) {
-    //           if (results.success) {
-    //             const end = performance.now();
+            if (recap.data) {
+              const results = await sendLoopsEvent({
+                userId: user.uuid,
+                eventName: "monthly-recaps",
+                properties: {
+                  totalSets: recap.data?.stories.sets.totalSetsAdded,
+                  dateHeader: dayjs
+                    .utc(recap.data?.reportDate)
+                    .format("MMMM YYYY"),
+                  piecesBuilt: recap.data.stories.sets.totalPieceCount,
+                  totalMinifigures:
+                    recap.data.stories.minifigs.totalMinifigsAdded,
+                  setsBuilt: recap.data?.stories.sets.totalSetsBuilt,
+                  recapUrl: `https://getbrickd.com/user-recaps/${user.uuid}?utm_source=email`,
+                },
+              });
 
-    //             await prisma.brickd_UserRecap.update({
-    //               data: {
-    //                 status: "COMPLETE",
-    //                 emailResponse: JSON.stringify(results),
-    //                 emailTimeTaken: end - now,
-    //                 emailSentAt: new Date(),
-    //               },
-    //               where: {
-    //                 id: user.id,
-    //               },
-    //             });
-    //           } else {
-    //             await prisma.brickd_UserRecap.update({
-    //               data: {
-    //                 status: "ERROR",
-    //                 emailResponse: JSON.stringify(results),
-    //                 emailSentAt: new Date(),
-    //               },
-    //               where: {
-    //                 id: user.id,
-    //               },
-    //             });
-    //           }
-    //         } else {
-    //           await prisma.brickd_UserRecap.update({
-    //             data: {
-    //               status: "ERROR",
-    //               emailResponse: "Unknown Error (Empty Response)",
-    //               emailSentAt: new Date(),
-    //             },
-    //             where: {
-    //               id: user.id,
-    //             },
-    //           });
-    //         }
-    //       } else {
-    //         await prisma.brickd_UserRecap.update({
-    //           data: {
-    //             status: "ERROR",
-    //             emailResponse: "invaid user or recap.data",
-    //             statusDate: new Date(),
-    //           },
-    //           where: {
-    //             id: user.id,
-    //           },
-    //         });
-    //       }
-    //     }
-    //   }
-    // } catch (err: any) {
-    //   console.log(err);
+              if (results) {
+                if (results.success) {
+                  const end = performance.now();
 
-    //   if (isYIB === 1) {
-    //     await prisma.brickd_YearInBrickUser.updateMany({
-    //       data: {
-    //         status: "ERROR",
-    //         emailResponse: err.message,
-    //         updatedAt: new Date(),
-    //       },
-    //       where: {
-    //         reportId,
-    //         userId: user.id,
-    //       },
-    //     });
-    //   } else {
-    //     await prisma.brickd_UserRecap.update({
-    //       data: {
-    //         status: "ERROR",
-    //         emailResponse: err.message,
-    //         statusDate: new Date(),
-    //       },
-    //       where: {
-    //         id: user.id,
-    //       },
-    //     });
-    //   }
-    // } finally {
-    //   const end = performance.now();
-    //   console.log(`Time: ${(end - now).toFixed(2)}ms`);
-    //   console.log(`Do with ${user.user?.userName || "Unknown"}`);
-    // }
+                  await prisma.brickd_UserRecap.update({
+                    data: {
+                      status: "COMPLETE",
+                      emailResponse: JSON.stringify(results),
+                      emailTimeTaken: end - now,
+                      emailSentAt: new Date(),
+                    },
+                    where: {
+                      id: user.id,
+                    },
+                  });
+                } else {
+                  await prisma.brickd_UserRecap.update({
+                    data: {
+                      status: "ERROR",
+                      emailResponse: JSON.stringify(results),
+                      emailSentAt: new Date(),
+                    },
+                    where: {
+                      id: user.id,
+                    },
+                  });
+                }
+              } else {
+                await prisma.brickd_UserRecap.update({
+                  data: {
+                    status: "ERROR",
+                    emailResponse: "Unknown Error (Empty Response)",
+                    emailSentAt: new Date(),
+                  },
+                  where: {
+                    id: user.id,
+                  },
+                });
+              }
+            } else {
+              await prisma.brickd_UserRecap.update({
+                data: {
+                  status: "ERROR",
+                  emailResponse: "invaid user or recap.data",
+                  statusDate: new Date(),
+                },
+                where: {
+                  id: user.id,
+                },
+              });
+            }
+          }
+        }
+      }
+    } catch (err: any) {
+      console.log(err);
+
+      if (isYIB === 1) {
+        await prisma.brickd_YearInBrickUser.updateMany({
+          data: {
+            status: "ERROR",
+            emailResponse: err.message,
+            updatedAt: new Date(),
+          },
+          where: {
+            reportId,
+            userId: user.id,
+          },
+        });
+      } else {
+        await prisma.brickd_UserRecap.update({
+          data: {
+            status: "ERROR",
+            emailResponse: err.message,
+            statusDate: new Date(),
+          },
+          where: {
+            id: user.id,
+          },
+        });
+      }
+    } finally {
+      const end = performance.now();
+      console.log(`Time: ${(end - now).toFixed(2)}ms`);
+      console.log(`Do with ${user.userName || "Unknown"}`);
+    }
 
     await prisma.brickd_UserRecapReportEmailLog.update({
       data: {
