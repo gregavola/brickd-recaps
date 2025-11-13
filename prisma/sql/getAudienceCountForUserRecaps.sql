@@ -9,6 +9,5 @@ from
     )
 WHERE
     "brickd"."brickd_UserRecapReportAudience"."reportId" = $1
-    and u."enableCommunicationEmails" = 1
     and "brickd"."brickd_UserRecap"."status" IN ('CREATED', 'QUEUED')
     and "brickd"."brickd_UserRecap"."emailResponse" IS NULL

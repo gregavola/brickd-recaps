@@ -1990,9 +1990,13 @@ export const getUserRecapS3 = async ({
 export const sendEmails = async ({
   reportId,
   offset,
+  logId,
+  logName,
 }: {
   reportId: number;
   offset: number;
+  logId: number;
+  logName?: string | null;
 }) => {
   dayjs.extend(utc);
   const data = await prisma.brickd_UserRecapReport.findFirst({
@@ -2025,20 +2029,22 @@ export const sendEmails = async ({
           getAudienceForEmailForUserRecap(reportId, offset, 100)
         );
 
-  const reportLog = await prisma.brickd_UserRecapReportEmailLog.create({
-    data: {
-      reportId,
-      status: "RUNNING",
-      offset,
-      startTime: new Date(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-  });
-
   let currentOffset = offset;
 
   console.log(`Size: ${users.length}`);
+
+  await prisma.brickd_UserRecapReportEmailLog.update({
+    data: {
+      ...(logName && {
+        logName,
+      }),
+      totalUsers: users.length,
+      updatedAt: new Date(),
+    },
+    where: {
+      id: logId,
+    },
+  });
 
   let mainStartTime: number, mainEndTime: number;
 
@@ -2251,18 +2257,18 @@ export const sendEmails = async ({
           },
         });
       }
-    } finally {
-      const end = performance.now();
-      console.log(`Time: ${(end - now).toFixed(2)}ms`);
-      console.log(`Do with ${user.userName || "Unknown"}`);
     }
+
+    const end = performance.now();
+    console.log(`Time: ${(end - now).toFixed(2)}ms`);
+    console.log(`Done with ${user.userName}`);
 
     await prisma.brickd_UserRecapReportEmailLog.update({
       data: {
         currentOffset,
       },
       where: {
-        id: reportLog.id,
+        id: logId,
       },
     });
 
@@ -2278,7 +2284,7 @@ export const sendEmails = async ({
       currentOffset: offset + 1000,
     },
     where: {
-      id: reportLog.id,
+      id: logId,
     },
   });
 
@@ -3180,7 +3186,7 @@ export const runOne = async (event: any, context?: Context) => {
     }
 
     console.log("== Email ===");
-    await sendEmails({ reportId, offset });
+    await sendEmails({ reportId, offset, logName: logStreamName, logId });
   } else if (startEmails) {
     if (!reportId) {
       console.error(`Missing Report ID`);
