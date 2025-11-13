@@ -32,6 +32,7 @@ import {
   yibMinifiguresByUser,
   yibOverallEngagement,
   yibTopUserHourDay,
+  yibTotalDuration,
   yibTotalSetRetailValue,
   yibUserBadges,
   yibUserTopLocations,
@@ -188,6 +189,12 @@ interface YearInBricks {
       topHour24: string;
       topDayOfWeek: string;
       count: number;
+    };
+    buildTime?: {
+      max: number;
+      sum: number;
+      avg: number;
+      total: number;
     };
   };
   streak?: {
@@ -456,6 +463,10 @@ const getYearInBricksReview = async ({
         yibTopUserHourDay(userId, startDate, endDate)
       );
 
+      const buildTime = await prisma.$queryRawTyped(
+        yibTotalDuration(userId, startDate, endDate)
+      );
+
       yearinBricks.numbers = {
         addedToList: Number(item.total_sets_added),
 
@@ -488,6 +499,14 @@ const getYearInBricksReview = async ({
             count: Number(topDayHour[0].hour_activity_count),
             topHour12: topDayHour[0].hour_range_12,
             topHour24: topDayHour[0].hour_range_24,
+          },
+        }),
+        ...(buildTime.length !== 0 && {
+          buildTime: {
+            max: Number(buildTime[0].maxDuration),
+            sum: Number(buildTime[0].totalDurationSum),
+            avg: Number(buildTime[0].avgDuration),
+            total: Number(buildTime[0].itemsWithDuration),
           },
         }),
       };
