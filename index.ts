@@ -2910,6 +2910,7 @@ export const processYearInBricks = async ({
     });
 
     if (!id) {
+      console.log(`🟢 NEW RECORD in brickd_YearInBrickUser`);
       const response = await prisma.brickd_YearInBrickUser.create({
         data: {
           userId: Number(user.userId),
@@ -2919,7 +2920,7 @@ export const processYearInBricks = async ({
           createdAt: new Date(),
           collectionCount: 0,
           dataUrlStatus: 0,
-          dataUrl: null,
+          dataUrl: "",
         },
       });
 
@@ -2961,8 +2962,7 @@ export const processYearInBricks = async ({
 
     console.log(`Full Time: ${timeDiff}ms`);
 
-    console.log(`Recap: ${id ? "YES" : "NO"}`);
-
+    console.log(`🟡 UPDATE RECORD in brickd_YearInBrickUser`);
     await prisma.brickd_YearInBrickUser.updateMany({
       data: {
         updatedAt: new Date(),
@@ -2994,7 +2994,11 @@ export const processYearInBricks = async ({
   masterEndTime = performance.now();
 
   if (logId) {
+    console.log(`Log Completed for ${offset}`);
+
     const timeDiff = (masterEndTime - masterTime).toFixed(3);
+
+    console.log(`Time: ${timeDiff}`);
 
     await prisma.brickd_UserRecapReportLog.update({
       data: {
