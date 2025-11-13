@@ -26,6 +26,8 @@ WITH
             ) AS "totalMinifigs"
         FROM
             "brickd"."brickd_User"
+        WHERE
+            "brickd"."brickd_User"."isActive" = 1
     )
 SELECT
     a.*
