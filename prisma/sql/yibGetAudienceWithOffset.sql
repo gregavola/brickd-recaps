@@ -7,6 +7,8 @@ from
     INNER JOIN "brickd"."brickd_User" on "brickd"."brickd_User".id = a."userId"
 WHERE
     "reportId" = $1
+ORDER By
+    a."userId"
 OFFSET
     $2
 LIMIT
