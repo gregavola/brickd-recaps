@@ -1954,6 +1954,7 @@ export const kickOffEmails = async ({ reportId }: { reportId: number }) => {
       const payload = {
         emails: true,
         offset,
+        logId: data.id,
         reportId,
       };
 
@@ -2066,6 +2067,7 @@ export const kickOffSingleUserEmails = async ({
       const payload = {
         emails: true,
         userId,
+        logId: data.id,
         reportId,
       };
 
