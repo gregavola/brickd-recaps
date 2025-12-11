@@ -3563,7 +3563,7 @@ export const runOne = async (event: any, context?: Context) => {
       yibYear: yibYear || null,
       loopsId,
     });
-  } else if (userId) {
+  } else if (userId && !startEmails) {
     console.log(`== SINGLE ${userId} ===`);
 
     console.log(`Passed Report ID: ${reportId || "NOT_PASSED"}`);
