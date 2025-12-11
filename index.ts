@@ -2056,6 +2056,7 @@ export const kickOffSingleUserEmails = async ({
         updatedAt: new Date(),
         startTime: new Date(),
         status: "QUEUED",
+        isTest: 1,
         offset,
         reportId,
       },
@@ -2436,7 +2437,7 @@ export const sendEmails = async ({
   if (count === 0) {
     await prisma.brickd_UserRecapReport.update({
       data: {
-        status: "COMPLETE",
+        status: "JOBCOMPLETE",
         isSendingEmail: 0,
         endTime: new Date(),
         updatedAt: new Date(),
@@ -2745,26 +2746,17 @@ export const sendSingleEmails = async ({
     },
   });
 
-  const count = await prisma.brickd_UserRecapReportEmailLog.count({
+  await prisma.brickd_UserRecapReport.update({
+    data: {
+      status: "COMPLETE",
+      isSendingEmail: 0,
+      endTime: new Date(),
+      updatedAt: new Date(),
+    },
     where: {
-      reportId,
-      status: { not: "COMPLETE" },
+      id: reportId,
     },
   });
-
-  if (count === 0) {
-    await prisma.brickd_UserRecapReport.update({
-      data: {
-        status: "COMPLETE",
-        isSendingEmail: 0,
-        endTime: new Date(),
-        updatedAt: new Date(),
-      },
-      where: {
-        id: reportId,
-      },
-    });
-  }
 };
 
 export const sendSingleEmail = async ({
