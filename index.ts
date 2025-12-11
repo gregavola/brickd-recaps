@@ -1902,6 +1902,7 @@ export const kickOffEmails = async ({ reportId }: { reportId: number }) => {
       startTime: new Date(),
       updatedAt: new Date(),
       status: "RUNNING",
+      isSendingEmail: 1,
     },
     where: {
       id: reportId,
@@ -2018,6 +2019,7 @@ export const kickOffSingleUserEmails = async ({
       startTime: new Date(),
       updatedAt: new Date(),
       status: "RUNNING",
+      isSendingEmail: 1,
     },
     where: {
       id: reportId,
