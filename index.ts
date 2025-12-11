@@ -2067,6 +2067,8 @@ export const kickOffSingleUserEmails = async ({
         reportId,
       };
 
+      console.log(payload);
+
       const command = new SendMessageCommand({
         QueueUrl:
           "https://sqs.us-east-1.amazonaws.com/726013842547/brickd-user-recaps",
@@ -3659,6 +3661,7 @@ export const runOne = async (event: any, context?: Context) => {
       console.log("== KICK OFF TASKS (EMAIL) ===");
 
       if (userId) {
+        console.log(`== Single User: ${userId} ===`);
         await kickOffSingleUserEmails({ reportId, userId });
       } else {
         await kickOffEmails({ reportId });
