@@ -3688,12 +3688,15 @@ export const handler = async (event: any, context?: Context): Promise<any> => {
 
   if (isSqsEvent(event)) {
     console.log(`SQS EVENT`);
+
+    let reportId: number | null = null;
     // SQS path: iterate records and return partial failures
     const failures: { itemIdentifier: string }[] = [];
 
     for (const rec of event.Records) {
       try {
         const body = safeParse(rec.body);
+        reportId = body.reportId;
         await runOne(body, context); // runs one at a time, logs in order
       } catch (err) {
         console.error("Record failed:", rec.messageId, err);
@@ -3703,6 +3706,20 @@ export const handler = async (event: any, context?: Context): Promise<any> => {
 
     const resp: SQSBatchResponse = { batchItemFailures: failures };
     console.log(`SQS result: ${JSON.stringify(resp)}`);
+
+    if (failures.length !== 0 && reportId) {
+      await prisma.brickd_UserRecapReport.update({
+        data: {
+          status: "ERROR",
+          isSendingEmail: 0,
+          error: "SEE_LOGS",
+          updatedAt: new Date(),
+        },
+        where: {
+          id: reportId,
+        },
+      });
+    }
     return resp;
   } else {
     console.log("manual EVENT");
@@ -3718,6 +3735,7 @@ export const handler = async (event: any, context?: Context): Promise<any> => {
         await prisma.brickd_UserRecapReport.update({
           data: {
             status: "ERROR",
+            isSendingEmail: 0,
             error: err.message,
             updatedAt: new Date(),
           },
