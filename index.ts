@@ -3644,7 +3644,7 @@ export const runOne = async (event: any, context?: Context) => {
         logName: logStreamName,
       });
     } else {
-      if (!offset) {
+      if (offset === null || offset === undefined) {
         throw new Error("Offset Missing");
       }
 
