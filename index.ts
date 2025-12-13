@@ -3587,7 +3587,7 @@ export const runOne = async (event: any, context?: Context) => {
         logId: null,
       });
     }
-  } else if (batch) {
+  } else if (batch && !emails) {
     if (!logId || !reportId) {
       throw new Error("Missing LogId / ReportId");
     }
