@@ -2177,6 +2177,7 @@ export const sendEmails = async ({
       ...(logName && {
         logName,
       }),
+      status: "RUNNING",
       totalUsers: users.length,
       updatedAt: new Date(),
     },
