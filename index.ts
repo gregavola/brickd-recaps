@@ -2421,7 +2421,7 @@ export const sendEmails = async ({
     data: {
       status: "JOBCOMPLETE",
       timeTaken: mainEndTime - mainStartTime,
-      currentOffset: offset + 1000,
+      currentOffset: offset + 100,
     },
     where: {
       id: logId,
@@ -2431,7 +2431,7 @@ export const sendEmails = async ({
   const count = await prisma.brickd_UserRecapReportEmailLog.count({
     where: {
       reportId,
-      status: { not: "COMPLETE" },
+      status: { not: "JOBCOMPLETE" },
     },
   });
 
