@@ -2535,13 +2535,14 @@ export const sendSingleEmails = async ({
           },
         });
       } else {
-        await prisma.brickd_UserRecap.update({
+        await prisma.brickd_UserRecap.updateMany({
           data: {
             status: "RUNNING",
             statusDate: new Date(),
           },
           where: {
-            uuid: user.uuid,
+            userId: user.id,
+            reportId,
           },
         });
       }
@@ -2560,14 +2561,15 @@ export const sendSingleEmails = async ({
             },
           });
         } else {
-          await prisma.brickd_UserRecap.update({
+          await prisma.brickd_UserRecap.updateMany({
             data: {
               status: "COMPLETE",
               emailResponse: JSON.stringify({ skipped: true }),
               statusDate: new Date(),
             },
             where: {
-              uuid: user.uuid,
+              reportId,
+              userId: user.id,
             },
           });
         }
@@ -2647,7 +2649,7 @@ export const sendSingleEmails = async ({
                 if (results.success) {
                   const end = performance.now();
 
-                  await prisma.brickd_UserRecap.update({
+                  await prisma.brickd_UserRecap.updateMany({
                     data: {
                       status: "COMPLETE",
                       emailResponse: JSON.stringify(results),
@@ -2655,18 +2657,20 @@ export const sendSingleEmails = async ({
                       emailSentAt: new Date(),
                     },
                     where: {
-                      id: user.id,
+                      reportId,
+                      userId: user.id,
                     },
                   });
                 } else {
-                  await prisma.brickd_UserRecap.update({
+                  await prisma.brickd_UserRecap.updateMany({
                     data: {
                       status: "ERROR",
                       emailResponse: JSON.stringify(results),
                       emailSentAt: new Date(),
                     },
                     where: {
-                      id: user.id,
+                      reportId,
+                      userId: user.id,
                     },
                   });
                 }
@@ -2683,14 +2687,15 @@ export const sendSingleEmails = async ({
                 });
               }
             } else {
-              await prisma.brickd_UserRecap.update({
+              await prisma.brickd_UserRecap.updateMany({
                 data: {
                   status: "ERROR",
                   emailResponse: "invaid user or recap.data",
                   statusDate: new Date(),
                 },
                 where: {
-                  id: user.id,
+                  reportId,
+                  userId: user.id,
                 },
               });
             }
@@ -2713,14 +2718,15 @@ export const sendSingleEmails = async ({
           },
         });
       } else {
-        await prisma.brickd_UserRecap.update({
+        await prisma.brickd_UserRecap.updateMany({
           data: {
             status: "ERROR",
             emailResponse: err.message,
             statusDate: new Date(),
           },
           where: {
-            id: user.id,
+            reportId,
+            userId: user.id,
           },
         });
       }
