@@ -1912,7 +1912,7 @@ export const kickOffEmails = async ({ reportId }: { reportId: number }) => {
   const results =
     isYIB === 1
       ? await prisma.$queryRawTyped(getAudienceCountForYearInBricks(reportId))
-      : prisma.$queryRawTyped(getAudienceCountForUserRecaps(reportId));
+      : await prisma.$queryRawTyped(getAudienceCountForUserRecaps(reportId));
 
   if (isYIB === 1) {
     console.log(`=== Year in Bricks for ${yibYear} ===`);
