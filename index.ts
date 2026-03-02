@@ -343,7 +343,7 @@ const upstash = {
 const getCloudFrontSetImage = (
   setNumber: string,
   customImageUrl: string | null,
-  imageUrl: string
+  imageUrl: string,
 ) => {
   if (!customImageUrl) {
     return imageUrl;
@@ -391,20 +391,20 @@ const getYearInBricksReview = async ({
 
   const userStartTime = DateTime.fromISO(start, { zone: "utc" }).setZone(
     timeZone.timeZone || "Etc/GMT",
-    { keepLocalTime: true }
+    { keepLocalTime: true },
   );
   const userEndTime = DateTime.fromISO(end, { zone: "utc" }).setZone(
     timeZone.timeZone || "Etc/GMT",
-    { keepLocalTime: true }
+    { keepLocalTime: true },
   );
 
   console.log(
     `User Local Start Time: ${userStartTime.toFormat(
-      "yyyy-MM-dd HH:mm:ss ZZZZ"
-    )}`
+      "yyyy-MM-dd HH:mm:ss ZZZZ",
+    )}`,
   );
   console.log(
-    `User Local End Time: ${userEndTime.toFormat("yyyy-MM-dd HH:mm:ss ZZZZ")}`
+    `User Local End Time: ${userEndTime.toFormat("yyyy-MM-dd HH:mm:ss ZZZZ")}`,
   );
 
   const startDate = userStartTime.toJSDate();
@@ -446,7 +446,7 @@ const getYearInBricksReview = async ({
 
   // Numbers
   const bigNumbers = await prisma.$queryRawTyped(
-    yibBigNumbersByUser(userId, startDate, endDate)
+    yibBigNumbersByUser(userId, startDate, endDate),
   );
 
   if (bigNumbers.length !== 0) {
@@ -454,19 +454,19 @@ const getYearInBricksReview = async ({
 
     if (item.total_sets_added !== 0) {
       const bigNumbersByMonth = await prisma.$queryRawTyped(
-        yibGetSetsAndPieceCountByMonth(userId, startDate, endDate)
+        yibGetSetsAndPieceCountByMonth(userId, startDate, endDate),
       );
 
       const setValue = await prisma.$queryRawTyped(
-        yibTotalSetRetailValue(userId, startDate, endDate)
+        yibTotalSetRetailValue(userId, startDate, endDate),
       );
 
       const topDayHour = await prisma.$queryRawTyped(
-        yibTopUserHourDay(userId, startDate, endDate)
+        yibTopUserHourDay(userId, startDate, endDate),
       );
 
       const buildTime = await prisma.$queryRawTyped(
-        yibTotalDuration(userId, startDate, endDate)
+        yibTotalDuration(userId, startDate, endDate),
       );
 
       yearinBricks.numbers = {
@@ -517,7 +517,7 @@ const getYearInBricksReview = async ({
 
   // Streak
   const streak = await prisma.$queryRawTyped(
-    yibLongestStreak(userId, startDate, endDate)
+    yibLongestStreak(userId, startDate, endDate),
   );
 
   if (streak.length !== 0) {
@@ -534,7 +534,7 @@ const getYearInBricksReview = async ({
 
   // places
   const places = await prisma.$queryRawTyped(
-    yibUserTopLocations(userId, startDate, endDate, 10)
+    yibUserTopLocations(userId, startDate, endDate, 10),
   );
 
   if (places.length !== 0 && Number(places[0].total_unique_locations) >= 1) {
@@ -555,7 +555,7 @@ const getYearInBricksReview = async ({
   }
   // Themes
   const themes = await prisma.$queryRawTyped(
-    yibGetUserTopThemes(userId, startDate, endDate, 10)
+    yibGetUserTopThemes(userId, startDate, endDate, 10),
   );
 
   if (themes.length > 1) {
@@ -569,7 +569,7 @@ const getYearInBricksReview = async ({
             image: getCloudFrontSetImage(
               image["setNumber"] as string,
               image["customImageUrl"],
-              image["setImageUrl"]
+              image["setImageUrl"],
             ),
             name: image["name"],
           };
@@ -584,7 +584,7 @@ const getYearInBricksReview = async ({
               image: getCloudFrontSetImage(
                 image["setNumber"] as string,
                 image["customImageUrl"],
-                image["setImageUrl"]
+                image["setImageUrl"],
               ),
               name: image["name"],
             };
@@ -595,7 +595,7 @@ const getYearInBricksReview = async ({
   }
 
   const minifigures = await prisma.$queryRawTyped(
-    yibMinifiguresByUser(userId, startDate, endDate)
+    yibMinifiguresByUser(userId, startDate, endDate),
   );
 
   if (minifigures.length !== 0 && minifigures[0].unique_minifigs_added >= 1) {
@@ -611,7 +611,7 @@ const getYearInBricksReview = async ({
   }
 
   const wishlist = await prisma.$queryRawTyped(
-    yibWishListAdds(userId, startDate, endDate)
+    yibWishListAdds(userId, startDate, endDate),
   );
 
   if (wishlist.length !== 0 && wishlist[0].total_wishlist_added >= 1) {
@@ -623,7 +623,7 @@ const getYearInBricksReview = async ({
 
   let yibActivity: YIBActivity | null = null;
   const engagement = await prisma.$queryRawTyped(
-    yibOverallEngagement(userId, startDate, endDate)
+    yibOverallEngagement(userId, startDate, endDate),
   );
 
   if (engagement.length !== 0 && engagement[0].top_activity_id) {
@@ -802,7 +802,7 @@ const getYearInBricksReview = async ({
 
   let yibDiscussion: YIBDiscussion | null = null;
   const discussions = await prisma.$queryRawTyped(
-    yibDiscussionEngagement(userId, startDate, endDate)
+    yibDiscussionEngagement(userId, startDate, endDate),
   );
 
   if (discussions.length !== 0 && discussions[0].top_discussion_id) {
@@ -896,7 +896,7 @@ const getYearInBricksReview = async ({
   }
 
   const media = await prisma.$queryRawTyped(
-    yibUserTotalMedia(userId, startDate, endDate)
+    yibUserTotalMedia(userId, startDate, endDate),
   );
 
   if (media.length !== 0) {
@@ -919,7 +919,7 @@ const getYearInBricksReview = async ({
   }
 
   const badges = await prisma.$queryRawTyped(
-    yibUserBadges(userId, startDate, endDate)
+    yibUserBadges(userId, startDate, endDate),
   );
 
   if (badges.length !== 0 && Number(badges[0].users_earned) !== 0) {
@@ -979,20 +979,20 @@ const getUserRecaps = async ({
 
   const userStartTime = DateTime.fromISO(start, { zone: "utc" }).setZone(
     timeZone.timeZone || "Etc/GMT",
-    { keepLocalTime: true }
+    { keepLocalTime: true },
   );
   const userEndTime = DateTime.fromISO(end, { zone: "utc" }).setZone(
     timeZone.timeZone || "Etc/GMT",
-    { keepLocalTime: true }
+    { keepLocalTime: true },
   );
 
   console.log(
     `User Local Start Time: ${userStartTime.toFormat(
-      "yyyy-MM-dd HH:mm:ss ZZZZ"
-    )}`
+      "yyyy-MM-dd HH:mm:ss ZZZZ",
+    )}`,
   );
   console.log(
-    `User Local End Time: ${userEndTime.toFormat("yyyy-MM-dd HH:mm:ss ZZZZ")}`
+    `User Local End Time: ${userEndTime.toFormat("yyyy-MM-dd HH:mm:ss ZZZZ")}`,
   );
 
   const startDate = userStartTime.toJSDate();
@@ -1162,7 +1162,7 @@ const getUserRecaps = async ({
   // );
 
   const userStreak = await prisma.$queryRawTyped(
-    getUserStreakThisMonth(userId, startDate, endDate)
+    getUserStreakThisMonth(userId, startDate, endDate),
   );
 
   // console.log(`userStreak.custom: ${new Date().toISOString()}`);
@@ -1228,7 +1228,7 @@ const getUserRecaps = async ({
     subItem.set.setImageUrl = getCloudFrontSetImage(
       subItem.set.setNumber,
       subItem.set.customSetImageUrl,
-      subItem.set.setImageUrl
+      subItem.set.setImageUrl,
     );
 
     return subItem;
@@ -1237,7 +1237,7 @@ const getUserRecaps = async ({
   // Locations
 
   const locationCounts = await prisma.$queryRawTyped(
-    getUnqiueLocationCountForUser(userId, startDate, endDate)
+    getUnqiueLocationCountForUser(userId, startDate, endDate),
   );
 
   // console.log(
@@ -1274,7 +1274,7 @@ const getUserRecaps = async ({
   // });
 
   const topLocations = await prisma.$queryRawTyped(
-    getUserTopLocations(userId, startDate, endDate, 5)
+    getUserTopLocations(userId, startDate, endDate, 5),
   );
 
   // console.log(`getUserTopLocations.custom: ${new Date().toISOString()}`);
@@ -1282,7 +1282,7 @@ const getUserRecaps = async ({
   // Total Sets Built
 
   const totalPieceCount = await prisma.$queryRawTyped(
-    getTotalPieceCountForUserWithRange(startDate, endDate, userId)
+    getTotalPieceCountForUserWithRange(startDate, endDate, userId),
   );
 
   // console.log(
@@ -1363,7 +1363,7 @@ const getUserRecaps = async ({
   // );
 
   const countData = await prisma.$queryRawTyped(
-    getUserRecapStandardStats(userId, startDate, endDate)
+    getUserRecapStandardStats(userId, startDate, endDate),
   );
 
   // console.log(`getUserRecapStandardStats.custom: ${new Date().toISOString()}`);
@@ -1414,7 +1414,7 @@ const getUserRecaps = async ({
   });
 
   const totalActivityType = await prisma.$queryRawTyped(
-    getUserTopActivityTypesByDate(userId, startDate, endDate)
+    getUserTopActivityTypesByDate(userId, startDate, endDate),
   );
 
   // console.log(
@@ -1422,7 +1422,7 @@ const getUserRecaps = async ({
   // );
 
   const totalMediaTypes = await prisma.$queryRawTyped(
-    getUserTopMediaTypesByDates(userId, startDate, endDate)
+    getUserTopMediaTypesByDates(userId, startDate, endDate),
   );
 
   // console.log(
@@ -1432,7 +1432,7 @@ const getUserRecaps = async ({
   // top 5 themes
 
   const topThemes = await prisma.$queryRawTyped(
-    getUserTopThemes(userId, startDate, endDate, 5)
+    getUserTopThemes(userId, startDate, endDate, 5),
   );
 
   // console.log(
@@ -1440,7 +1440,7 @@ const getUserRecaps = async ({
   // );
 
   const topThemeTotalCount = await prisma.$queryRawTyped(
-    getUserTopThemeCount(userId, startDate, endDate)
+    getUserTopThemeCount(userId, startDate, endDate),
   );
 
   // console.log(`getUserTopThemeCount.custom: ${new Date().toISOString()}`);
@@ -1451,7 +1451,7 @@ const getUserRecaps = async ({
   let activity: any | null = null;
 
   const topActivity = await prisma.$queryRawTyped(
-    getTopUserActivity(userId, startDate, endDate, 1)
+    getTopUserActivity(userId, startDate, endDate, 1),
   );
 
   // console.log(`getTopUserActivity.custom: ${new Date().toISOString()}`);
@@ -1511,7 +1511,7 @@ const getUserRecaps = async ({
         data.collectionItem.set.setImageUrl = getCloudFrontSetImage(
           data.collectionItem.set.setNumber,
           data.collectionItem.set.customSetImageUrl,
-          data.collectionItem.set.setImageUrl
+          data.collectionItem.set.setImageUrl,
         );
       }
 
@@ -1558,7 +1558,7 @@ const getUserRecaps = async ({
         totalPiecesBuilt: globalStats.totalPieces,
         totalSetsBuilt: globalStats.totalSets,
         userPercentile: parseFloat(
-          ((totalPieceCountValue / globalStats.totalPieces) * 100).toFixed(2)
+          ((totalPieceCountValue / globalStats.totalPieces) * 100).toFixed(2),
         ),
       },
       streaks: {
@@ -1686,7 +1686,7 @@ const getMonthlyStats = async ({
   }
 
   const data = await prisma.$queryRawTyped(
-    getGlobalBuiltStats(startDate, endDate)
+    getGlobalBuiltStats(startDate, endDate),
   );
 
   if (data.length === 0) {
@@ -1753,7 +1753,7 @@ export const kickOffTasks = async ({
   const { isYIB, yibYear } = data;
 
   console.log(
-    `Starting for ${startDate.toISOString()} to ${endDate.toISOString()}`
+    `Starting for ${startDate.toISOString()} to ${endDate.toISOString()}`,
   );
 
   await prisma.brickd_UserRecapReport.update({
@@ -1768,7 +1768,7 @@ export const kickOffTasks = async ({
   });
 
   const results = await prisma.$queryRawTyped(
-    getAudienceCount(startDate.toDate(), endDate.toDate())
+    getAudienceCount(startDate.toDate(), endDate.toDate()),
   );
 
   if (isYIB === 1) {
@@ -1894,7 +1894,7 @@ export const kickOffEmails = async ({ reportId }: { reportId: number }) => {
   const { isYIB, yibYear } = data;
 
   console.log(
-    `Starting for ${startDate.toISOString()} to ${endDate.toISOString()}`
+    `Starting for ${startDate.toISOString()} to ${endDate.toISOString()}`,
   );
 
   await prisma.brickd_UserRecapReport.update({
@@ -2012,7 +2012,7 @@ export const kickOffSingleUserEmails = async ({
   const { isYIB, yibYear } = data;
 
   console.log(
-    `Starting for ${startDate.toISOString()} to ${endDate.toISOString()}`
+    `Starting for ${startDate.toISOString()} to ${endDate.toISOString()}`,
   );
 
   await prisma.brickd_UserRecapReport.update({
@@ -2162,10 +2162,10 @@ export const sendEmails = async ({
   const users =
     isYIB === 1
       ? await prisma.$queryRawTyped(
-          getAudienceForEmailForYib(reportId, offset, 100)
+          getAudienceForEmailForYib(reportId, offset, 100),
         )
       : await prisma.$queryRawTyped(
-          getAudienceForEmailForUserRecap(reportId, offset, 100)
+          getAudienceForEmailForUserRecap(reportId, offset, 100),
         );
 
   let currentOffset = offset;
@@ -2208,13 +2208,14 @@ export const sendEmails = async ({
           },
         });
       } else {
-        await prisma.brickd_UserRecap.update({
+        await prisma.brickd_UserRecap.updateMany({
           data: {
             status: "RUNNING",
             statusDate: new Date(),
           },
           where: {
-            uuid: user.uuid,
+            reportId,
+            userId: user.id,
           },
         });
       }
@@ -2233,14 +2234,15 @@ export const sendEmails = async ({
             },
           });
         } else {
-          await prisma.brickd_UserRecap.update({
+          await prisma.brickd_UserRecap.updateMany({
             data: {
               status: "COMPLETE",
               emailResponse: JSON.stringify({ skipped: true }),
               statusDate: new Date(),
             },
             where: {
-              uuid: user.uuid,
+              reportId,
+              userId: user.id,
             },
           });
         }
@@ -2320,7 +2322,7 @@ export const sendEmails = async ({
                 if (results.success) {
                   const end = performance.now();
 
-                  await prisma.brickd_UserRecap.update({
+                  await prisma.brickd_UserRecap.updateMany({
                     data: {
                       status: "COMPLETE",
                       emailResponse: JSON.stringify(results),
@@ -2328,7 +2330,8 @@ export const sendEmails = async ({
                       emailSentAt: new Date(),
                     },
                     where: {
-                      id: user.id,
+                      reportId,
+                      userId: user.id,
                     },
                   });
                 } else {
@@ -2344,26 +2347,28 @@ export const sendEmails = async ({
                   });
                 }
               } else {
-                await prisma.brickd_UserRecap.update({
+                await prisma.brickd_UserRecap.updateMany({
                   data: {
                     status: "ERROR",
                     emailResponse: "Unknown Error (Empty Response)",
                     emailSentAt: new Date(),
                   },
                   where: {
-                    id: user.id,
+                    reportId,
+                    userId: user.id,
                   },
                 });
               }
             } else {
-              await prisma.brickd_UserRecap.update({
+              await prisma.brickd_UserRecap.updateMany({
                 data: {
                   status: "ERROR",
                   emailResponse: "invaid user or recap.data",
                   statusDate: new Date(),
                 },
                 where: {
-                  id: user.id,
+                  reportId,
+                  userId: user.id,
                 },
               });
             }
@@ -2386,14 +2391,15 @@ export const sendEmails = async ({
           },
         });
       } else {
-        await prisma.brickd_UserRecap.update({
+        await prisma.brickd_UserRecap.updateMany({
           data: {
             status: "ERROR",
             emailResponse: err.message,
             statusDate: new Date(),
           },
           where: {
-            id: user.id,
+            reportId,
+            userId: user.id,
           },
         });
       }
@@ -2486,10 +2492,10 @@ export const sendSingleEmails = async ({
   const users =
     isYIB === 1
       ? await prisma.$queryRawTyped(
-          getAudienceForEmailSingleUserYIB(reportId, userId)
+          getAudienceForEmailSingleUserYIB(reportId, userId),
         )
       : await prisma.$queryRawTyped(
-          getAudienceForEmailSingleUser(reportId, userId)
+          getAudienceForEmailSingleUser(reportId, userId),
         );
 
   console.log(`Size: ${users.length}`);
@@ -3009,7 +3015,7 @@ export const processRecap = async ({
   const endDate = dayjs.utc(reportDate).endOf("month");
 
   console.log(
-    `Starting for ${startDate.toISOString()} to ${endDate.toISOString()}`
+    `Starting for ${startDate.toISOString()} to ${endDate.toISOString()}`,
   );
 
   const hasOffset = offset !== undefined;
@@ -3045,15 +3051,15 @@ export const processRecap = async ({
 
   const results = hasOffset
     ? await prisma.$queryRawTyped(
-        getAudienceForMonthlyRecapsWithOffset(reportId, offset!, 100)
+        getAudienceForMonthlyRecapsWithOffset(reportId, offset!, 100),
       )
     : await prisma.$queryRawTyped(
         getAudienceForMonthlyRecapTest(
           startDate.toDate(),
           endDate.toDate(),
           reportId,
-          userId
-        )
+          userId,
+        ),
       );
 
   const globalStats = await getMonthlyStats({
@@ -3100,7 +3106,7 @@ export const processRecap = async ({
     const now = performance.now();
 
     console.log(
-      `== [${user.userId}] Starting with ${user.userName} - ${user.totalSets} sets ===`
+      `== [${user.userId}] Starting with ${user.userName} - ${user.totalSets} sets ===`,
     );
 
     console.log(`Start with Query: ${new Date().toISOString()}`);
@@ -3284,7 +3290,7 @@ export const processYearInBricks = async ({
   const endDate = dayjs.utc().endOf("year");
 
   console.log(
-    `Starting for ${startDate.toISOString()} to ${endDate.toISOString()}`
+    `Starting for ${startDate.toISOString()} to ${endDate.toISOString()}`,
   );
 
   const hasOffset = offset !== undefined;
@@ -3304,15 +3310,15 @@ export const processYearInBricks = async ({
 
   const results = hasOffset
     ? await prisma.$queryRawTyped(
-        yibGetAudienceWithOffset(reportId, offset!, 100)
+        yibGetAudienceWithOffset(reportId, offset!, 100),
       )
     : await prisma.$queryRawTyped(
         yibGetAudienceTest(
           startDate.toDate(),
           endDate.toDate(),
           reportId,
-          userId
-        )
+          userId,
+        ),
       );
 
   const globalStats = await getMonthlyStats({
@@ -3344,7 +3350,7 @@ export const processYearInBricks = async ({
     const now = performance.now();
 
     console.log(
-      `=== [${user.userId}] Starting with ${user.userName} - ${user.totalSets} (YIB) ===`
+      `=== [${user.userId}] Starting with ${user.userName} - ${user.totalSets} (YIB) ===`,
     );
 
     const start = performance.now();
