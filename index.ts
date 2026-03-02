@@ -2314,7 +2314,7 @@ export const sendEmails = async ({
                   totalMinifigures:
                     recap.data.stories.minifigs.totalMinifigsAdded,
                   setsBuilt: recap.data?.stories.sets.totalSetsBuilt,
-                  recapUrl: `https://getbrickd.com/user-recaps/${user.uuid}?utm_source=email`,
+                  recapUrl: `https://getbrickd.com/user-recaps/${user.reportUuid}?utm_source=email`,
                 },
               });
 
@@ -2641,7 +2641,7 @@ export const sendSingleEmails = async ({
                   totalMinifigures:
                     recap.data.stories.minifigs.totalMinifigsAdded,
                   setsBuilt: recap.data?.stories.sets.totalSetsBuilt,
-                  recapUrl: `https://getbrickd.com/user-recaps/${user.uuid}?utm_source=email`,
+                  recapUrl: `https://getbrickd.com/user-recaps/${user.reportUuid}?utm_source=email`,
                 },
               });
 

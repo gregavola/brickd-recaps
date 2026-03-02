@@ -2,6 +2,7 @@ SELECT
     u.id,
     u."uuid",
     ura."createdAt",
+    yibu."uuid" as "reportUuid",
     u."userName",
     u."enableCommunicationEmails"
 FROM

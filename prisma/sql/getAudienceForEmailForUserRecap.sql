@@ -3,6 +3,7 @@ SELECT
     u."uuid",
     ura."createdAt",
     u."userName",
+    ucr."uuid" as "reportUuid",
     u."enableCommunicationEmails"
 FROM
     "brickd"."brickd_UserRecapReportAudience" AS ura
