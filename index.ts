@@ -61,6 +61,19 @@ import { Redis, SetCommandOptions } from "@upstash/redis";
 
 // types
 
+const USER_RECAP_BATCH_SIZE = 100;
+const USER_RECAP_QUEUE_URL =
+  "https://sqs.us-east-1.amazonaws.com/726013842547/brickd-user-recaps";
+
+type MonthlyRecapAudienceUser = {
+  id?: number;
+  uuid: string;
+  userId: number;
+  userName: string | null;
+  totalSets: number | bigint;
+  totalMinifigs: number | bigint;
+};
+
 interface StreakData {
   rank: number | null;
   total: number;
@@ -1725,6 +1738,155 @@ export const sendLoopsEvent = async ({
   return data;
 };
 
+const getMissingMonthlyRecapAudience = async ({
+  reportId,
+  userIds,
+}: {
+  reportId: number;
+  userIds?: number[];
+}) => {
+  const userIdFilter =
+    userIds && userIds.length > 0
+      ? Prisma.sql`AND a."userId" IN (${Prisma.join(userIds)})`
+      : Prisma.empty;
+
+  return prisma.$queryRaw<MonthlyRecapAudienceUser[]>(Prisma.sql`
+    SELECT DISTINCT ON (a."userId")
+      a."id",
+      a."uuid",
+      a."userId",
+      a."totalSets",
+      a."totalMinifigs",
+      u."userName"
+    FROM
+      "brickd"."brickd_UserRecapReportAudience" AS a
+      INNER JOIN "brickd"."brickd_User" AS u ON u.id = a."userId"
+      LEFT JOIN "brickd"."brickd_UserRecap" AS ur ON ur."userId" = a."userId"
+        AND ur."reportId" = a."reportId"
+    WHERE
+      a."reportId" = ${reportId}
+      AND ur."id" IS NULL
+      ${userIdFilter}
+    ORDER BY
+      a."userId" ASC,
+      a."id" ASC
+  `);
+};
+
+export const kickOffMissingUserRecaps = async ({
+  reportId,
+}: {
+  reportId: number;
+}) => {
+  dayjs.extend(utc);
+
+  const data = await prisma.brickd_UserRecapReport.findFirst({
+    where: { id: reportId },
+  });
+
+  if (!data) {
+    throw new Error(`Invalid Report found for ${reportId}`);
+  }
+
+  if (data.isYIB === 1) {
+    throw new Error("Missing-only reruns are only supported for user recaps");
+  }
+
+  const runStartedAt = new Date();
+  const results = await getMissingMonthlyRecapAudience({ reportId });
+
+  console.log(`Missing User Recaps: ${results.length}`);
+
+  await prisma.brickd_UserRecapReport.update({
+    data: {
+      startTime: runStartedAt,
+      updatedAt: new Date(),
+      status: results.length === 0 ? "COMPLETE" : "RUNNING",
+      ...(results.length === 0 && {
+        endTime: new Date(),
+      }),
+    },
+    where: {
+      id: reportId,
+    },
+  });
+
+  if (results.length === 0) {
+    return;
+  }
+
+  const userIdChunks = chunk(
+    results.map((user) => user.userId),
+    USER_RECAP_BATCH_SIZE,
+  );
+
+  console.log(`=== Missing User Recap Pages: ${userIdChunks.length} ===`);
+
+  for await (const [item, userIdChunk] of userIdChunks.entries()) {
+    const offset = item * USER_RECAP_BATCH_SIZE;
+    const log = await prisma.brickd_UserRecapReportLog.create({
+      data: {
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        startTime: new Date(),
+        status: "QUEUED",
+        offset,
+        totalUsers: userIdChunk.length,
+        reportId,
+      },
+    });
+
+    console.log(`Requested Missing User Recap Offset: ${offset} - Page ${item}`);
+
+    try {
+      const payload = {
+        userIds: userIdChunk,
+        missingRecaps: true,
+        runStartedAt: runStartedAt.toISOString(),
+        offset,
+        reportId,
+        logId: log.id,
+        batch: true,
+        isYIB: data.isYIB,
+        ...(data.yibYear && {
+          yibYear: data.yibYear,
+        }),
+      };
+
+      const command = new SendMessageCommand({
+        QueueUrl: USER_RECAP_QUEUE_URL,
+        MessageBody: JSON.stringify(payload),
+      });
+
+      const results = await sqs.send(command);
+
+      await prisma.brickd_UserRecapReportLog.update({
+        data: {
+          sqsIngestedAt: new Date(),
+          sqsMessageId: results.MessageId,
+        },
+        where: {
+          id: log.id,
+        },
+      });
+    } catch (err: any) {
+      console.error(err);
+
+      await prisma.brickd_UserRecapReportLog.update({
+        data: {
+          updatedAt: new Date(),
+          endTime: new Date(),
+          status: "ERROR",
+          error: err.message,
+        },
+        where: {
+          id: log.id,
+        },
+      });
+    }
+  }
+};
+
 export const kickOffTasks = async ({
   reportId,
   rebuild,
@@ -1847,8 +2009,7 @@ export const kickOffTasks = async ({
       };
 
       const command = new SendMessageCommand({
-        QueueUrl:
-          "https://sqs.us-east-1.amazonaws.com/726013842547/brickd-user-recaps",
+        QueueUrl: USER_RECAP_QUEUE_URL,
         MessageBody: JSON.stringify(payload),
       });
 
@@ -1959,8 +2120,7 @@ export const kickOffEmails = async ({ reportId }: { reportId: number }) => {
       };
 
       const command = new SendMessageCommand({
-        QueueUrl:
-          "https://sqs.us-east-1.amazonaws.com/726013842547/brickd-user-recaps",
+        QueueUrl: USER_RECAP_QUEUE_URL,
         MessageBody: JSON.stringify(payload),
       });
 
@@ -2075,8 +2235,7 @@ export const kickOffSingleUserEmails = async ({
       console.log(payload);
 
       const command = new SendMessageCommand({
-        QueueUrl:
-          "https://sqs.us-east-1.amazonaws.com/726013842547/brickd-user-recaps",
+        QueueUrl: USER_RECAP_QUEUE_URL,
         MessageBody: JSON.stringify(payload),
       });
 
@@ -2986,20 +3145,26 @@ export const getReportMetadataFromId = async ({
 
 export const processRecap = async ({
   userId,
+  userIds,
   offset,
   logId,
   sendEmail,
   reportId,
   rebuild,
   logName,
+  missingRecaps,
+  runStartedAt,
 }: {
   userId?: number;
+  userIds?: number[];
   offset?: number;
   logId: number | null;
   sendEmail?: boolean;
   reportId: number;
   rebuild?: boolean;
   logName?: string | null;
+  missingRecaps?: boolean;
+  runStartedAt?: string;
 }) => {
   const data = await prisma.brickd_UserRecapReport.findFirst({
     where: { id: reportId },
@@ -3030,6 +3195,14 @@ export const processRecap = async ({
     console.log(`== TEST RUN for ${userId}===`);
   }
 
+  if (userIds && userIds.length > 0) {
+    console.log(`== USER ID RUN for ${userIds.length} users ===`);
+  }
+
+  if (missingRecaps) {
+    console.log("== MISSING USER RECAPS ONLY ===");
+  }
+
   if (hasOffset) {
     console.log(`== OFFSET RUN for ${offset}===`);
   }
@@ -3050,23 +3223,45 @@ export const processRecap = async ({
     });
   }
 
-  if (!userId && !hasOffset) {
-    console.log("Missing UserId or Offset");
+  if (!userId && !userIds?.length && !hasOffset) {
+    console.log("Missing UserId, UserIds, or Offset");
     return;
   }
 
-  const results = hasOffset
-    ? await prisma.$queryRawTyped(
-        getAudienceForMonthlyRecapsWithOffset(reportId, offset!, 100),
-      )
-    : await prisma.$queryRawTyped(
-        getAudienceForMonthlyRecapTest(
-          startDate.toDate(),
-          endDate.toDate(),
-          reportId,
+  let results: MonthlyRecapAudienceUser[] = [];
+
+  if (userIds && userIds.length > 0) {
+    results = await getMissingMonthlyRecapAudience({ reportId, userIds });
+  } else if (hasOffset) {
+    results = await prisma.$queryRawTyped(
+      getAudienceForMonthlyRecapsWithOffset(reportId, offset!, 100),
+    );
+  } else {
+    results = await prisma.$queryRawTyped(
+      getAudienceForMonthlyRecapTest(
+        startDate.toDate(),
+        endDate.toDate(),
+        reportId,
+        userId,
+      ),
+    );
+
+    if (missingRecaps && userId) {
+      const existingRecap = await prisma.brickd_UserRecap.findFirst({
+        where: {
           userId,
-        ),
-      );
+          reportId,
+        },
+      });
+
+      if (existingRecap) {
+        console.log(
+          `Skipping ${userId}; user already has recap ${existingRecap.id}`,
+        );
+        results = [];
+      }
+    }
+  }
 
   const globalStats = await getMonthlyStats({
     startDate: startDate.toDate(),
@@ -3160,6 +3355,11 @@ export const processRecap = async ({
       },
     });
 
+    if (id && missingRecaps) {
+      console.log(`Skipping ${user.userId}; recap ${id.id} already exists`);
+      continue;
+    }
+
     if (!id) {
       const response = await prisma.brickd_UserRecap.create({
         data: {
@@ -3221,7 +3421,32 @@ export const processRecap = async ({
       },
     });
 
-    if (hasOffset) {
+    if (missingRecaps && runStartedAt) {
+      const count = await prisma.brickd_UserRecapReportLog.count({
+        where: {
+          reportId,
+          createdAt: {
+            gte: new Date(runStartedAt),
+          },
+          status: {
+            in: ["QUEUED", "RUNNING"],
+          },
+        },
+      });
+
+      if (count === 0) {
+        await prisma.brickd_UserRecapReport.update({
+          data: {
+            status: "COMPLETE",
+            endTime: new Date(),
+            updatedAt: new Date(),
+          },
+          where: {
+            id: reportId,
+          },
+        });
+      }
+    } else if (hasOffset) {
       const count = await prisma.brickd_UserRecapReportLog.count({
         where: {
           reportId,
@@ -3535,12 +3760,15 @@ export const runOne = async (event: any, context?: Context) => {
 
   const {
     userId,
+    userIds,
     batch,
     offset,
     emails,
     startEmails,
     logId,
     rebuild,
+    missingRecaps,
+    runStartedAt,
     reportDate,
     incremental,
     reportId,
@@ -3549,12 +3777,15 @@ export const runOne = async (event: any, context?: Context) => {
     loopsId,
   }: {
     userId?: number;
+    userIds?: number[];
     incremental?: boolean;
     batch?: boolean;
     emails?: boolean;
     startEmails?: boolean;
     offset?: number;
     rebuild?: boolean;
+    missingRecaps?: boolean;
+    runStartedAt?: string;
     reportDate?: string;
     reportId?: number;
     logId?: number;
@@ -3597,6 +3828,7 @@ export const runOne = async (event: any, context?: Context) => {
         userId: event.userId,
         reportId: reportData.id,
         logId: null,
+        missingRecaps,
       });
     }
   } else if (batch && !emails) {
@@ -3612,6 +3844,12 @@ export const runOne = async (event: any, context?: Context) => {
       console.log(`== BATCH ${offset} ===`);
 
       if (data.isYIB === 1) {
+        if (missingRecaps) {
+          throw new Error(
+            "Missing-only reruns are only supported for user recaps",
+          );
+        }
+
         await processYearInBricks({
           reportId,
           logId,
@@ -3620,7 +3858,15 @@ export const runOne = async (event: any, context?: Context) => {
           logName: logStreamName,
         });
       } else {
-        await processRecap({ offset: offset || 0, logId, reportId, rebuild });
+        await processRecap({
+          userIds,
+          offset: offset || 0,
+          logId,
+          reportId,
+          rebuild,
+          missingRecaps,
+          runStartedAt,
+        });
       }
     }
   } else if (incremental) {
@@ -3641,6 +3887,13 @@ export const runOne = async (event: any, context?: Context) => {
       } else {
         await processRecap({ reportId, logId: null });
       }
+    }
+  } else if (missingRecaps) {
+    if (!reportId) {
+      console.error(`Missing Report ID`);
+    } else {
+      console.log("== KICK OFF MISSING USER RECAPS ===");
+      await kickOffMissingUserRecaps({ reportId });
     }
   } else if (emails) {
     if (!reportId) {
