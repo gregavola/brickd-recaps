@@ -17,3 +17,4 @@ test.html
 cookies.json
 .DS_Store
 .npmrc
+platform-generator.prisma
