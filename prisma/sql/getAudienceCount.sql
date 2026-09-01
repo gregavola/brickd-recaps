@@ -35,8 +35,8 @@ FROM
     audience a
 WHERE
     (
-        a."totalMinifigs" >= 2
-        OR a."totalSets" >= 5
+        a."totalMinifigs" >= 5
+        OR a."totalSets" >= 2
     )
 ORDER BY
     a.id ASC;
