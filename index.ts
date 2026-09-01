@@ -1836,7 +1836,9 @@ export const kickOffMissingUserRecaps = async ({
       },
     });
 
-    console.log(`Requested Missing User Recap Offset: ${offset} - Page ${item}`);
+    console.log(
+      `Requested Missing User Recap Offset: ${offset} - Page ${item}`,
+    );
 
     try {
       const payload = {
@@ -3829,6 +3831,7 @@ export const runOne = async (event: any, context?: Context) => {
         reportId: reportData.id,
         logId: null,
         missingRecaps,
+        logName: logStreamName,
       });
     }
   } else if (batch && !emails) {
@@ -3866,6 +3869,7 @@ export const runOne = async (event: any, context?: Context) => {
           rebuild,
           missingRecaps,
           runStartedAt,
+          logName: logStreamName,
         });
       }
     }
