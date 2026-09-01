@@ -975,7 +975,7 @@ const getUserRecaps = async ({
   dayjs.extend(utc);
   dayjs.extend(timezone);
 
-  const timeZone = await prisma.brickd_User.findFirst({
+  const timeZoneData = await prisma.brickd_User.findFirst({
     select: {
       timeZone: true,
     },
@@ -984,35 +984,22 @@ const getUserRecaps = async ({
     },
   });
 
-  console.log(`Start: ${new Date().toISOString()}`);
-
-  if (!timeZone) {
+  if (!timeZoneData) {
     throw new Error("User Not Found");
   }
 
+  const userTimeZone = timeZoneData.timeZone || "Etc/GMT";
   const userStartTime = DateTime.fromISO(start, { zone: "utc" }).setZone(
-    timeZone.timeZone || "Etc/GMT",
+    userTimeZone,
     { keepLocalTime: true },
   );
   const userEndTime = DateTime.fromISO(end, { zone: "utc" }).setZone(
-    timeZone.timeZone || "Etc/GMT",
+    userTimeZone,
     { keepLocalTime: true },
-  );
-
-  console.log(
-    `User Local Start Time: ${userStartTime.toFormat(
-      "yyyy-MM-dd HH:mm:ss ZZZZ",
-    )}`,
-  );
-  console.log(
-    `User Local End Time: ${userEndTime.toFormat("yyyy-MM-dd HH:mm:ss ZZZZ")}`,
   );
 
   const startDate = userStartTime.toJSDate();
   const endDate = userEndTime.toJSDate();
-
-  console.log("Prisma Start Date (UTC):", startDate);
-  console.log("Prisma End Date (UTC):", endDate);
 
   const reportDate = dayjs.utc(start).format("YYYY-MM-DD");
 
@@ -1559,7 +1546,7 @@ const getUserRecaps = async ({
 
   const totalMinifigQuantityValue: number = totalMinfigsQuanities;
 
-  return {
+  const recap = {
     reportDate,
     user,
     dates: {
@@ -1681,6 +1668,17 @@ const getUserRecaps = async ({
         totalBuildNotes,
         averagePerDay: totalBuildNotes / 365,
       },
+    },
+  };
+
+  return {
+    recap,
+    timeRange: {
+      timeZone: userTimeZone,
+      userLocalStart: userStartTime.toISO(),
+      userLocalEnd: userEndTime.toISO(),
+      prismaUtcStart: startDate.toISOString(),
+      prismaUtcEnd: endDate.toISOString(),
     },
   };
 };
@@ -1963,8 +1961,15 @@ export const kickOffTasks = async ({
 
   const chunks = chunk(dataInsert, 300);
 
-  for await (const chunk of chunks) {
-    await prisma.brickd_UserRecapReportAudience.createMany({ data: chunk });
+  for await (const [index, dataChunk] of chunks.entries()) {
+    const insertResult =
+      await prisma.brickd_UserRecapReportAudience.createMany({
+        data: dataChunk,
+      });
+
+    console.log(
+      `Inserted audience chunk ${index + 1}/${chunks.length}: ${insertResult.count} records`,
+    );
   }
 
   // 100 Per Job, that's Fine 🤷‍♂️
@@ -3159,7 +3164,7 @@ export const processRecap = async ({
 }: {
   userId?: number;
   userIds?: number[];
-  offset?: number;
+  offset?: number | null;
   logId: number | null;
   sendEmail?: boolean;
   reportId: number;
@@ -3191,7 +3196,8 @@ export const processRecap = async ({
     `Starting for ${startDate.toISOString()} to ${endDate.toISOString()}`,
   );
 
-  const hasOffset = offset !== undefined;
+  const normalizedOffset = offset ?? null;
+  const hasOffset = normalizedOffset !== null;
 
   if (userId) {
     console.log(`== TEST RUN for ${userId}===`);
@@ -3236,7 +3242,7 @@ export const processRecap = async ({
     results = await getMissingMonthlyRecapAudience({ reportId, userIds });
   } else if (hasOffset) {
     results = await prisma.$queryRawTyped(
-      getAudienceForMonthlyRecapsWithOffset(reportId, offset!, 100),
+      getAudienceForMonthlyRecapsWithOffset(reportId, normalizedOffset!, 100),
     );
   } else {
     results = await prisma.$queryRawTyped(
@@ -3286,9 +3292,6 @@ export const processRecap = async ({
   console.log(`Global Media Count:`);
   console.log(JSON.stringify(globalTotalMediaUploaded));
 
-  let recap: any | null = null;
-  let offsetValue: number = offset || 0;
-
   if (logId) {
     await prisma.brickd_UserRecapReportLog.update({
       data: {
@@ -3302,21 +3305,20 @@ export const processRecap = async ({
   }
 
   const dateKey = startDate.format("MM_YY");
+  const batchStartOffset = normalizedOffset;
+  const batchEndOffset = normalizedOffset !== null
+    ? normalizedOffset + Math.max(results.length - 1, 0)
+    : null;
 
   console.log(`REPORT DATE: ${dateKey}`);
 
-  for await (const user of results) {
-    const now = performance.now();
+  for await (const [userIndex, user] of results.entries()) {
+    const startedAt = new Date();
+    const startedAtMs = performance.now();
+    const userOffset =
+      normalizedOffset !== null ? normalizedOffset + userIndex : null;
 
-    console.log(
-      `== [${user.userId}] Starting with ${user.userName} - ${user.totalSets} sets ===`,
-    );
-
-    console.log(`Start with Query: ${new Date().toISOString()}`);
-
-    const start = performance.now();
-
-    const data = await getUserRecaps({
+    const { recap: recapData, timeRange } = await getUserRecaps({
       userId: user.userId,
       start: startDate.toISOString(),
       end: endDate.toISOString(),
@@ -3324,29 +3326,15 @@ export const processRecap = async ({
       mediaCount: globalTotalMediaUploaded,
     });
 
-    recap = data;
-
     const mediaKey = `${dateKey}/${user.uuid}.json`;
 
-    console.log(`Done with Query: ${new Date().toISOString()}`);
-
-    const end = performance.now();
-
-    console.log(`Time: ${end - start}ms`);
-
     await uploadUserRecaps({
-      data: JSON.stringify(data),
+      data: JSON.stringify(recapData),
       key: mediaKey,
       isYIB: 0,
     });
 
-    console.log(`S3 Upload Complete: ${new Date().toISOString()}`);
-
-    const later = performance.now();
-
-    const timeDiff = (later - now).toFixed(3);
-
-    console.log(`Full Time: ${timeDiff}ms`);
+    const processingDurationMs = performance.now() - startedAtMs;
 
     let recapId: number | null = null;
 
@@ -3368,7 +3356,7 @@ export const processRecap = async ({
           userId: user.userId,
           reportDate: startDate.toDate(),
           reportId,
-          timeTaken: parseFloat(timeDiff),
+          timeTaken: processingDurationMs,
           createdAt: new Date(),
           updatedAt: new Date(),
           dataUrl: mediaKey,
@@ -3377,13 +3365,12 @@ export const processRecap = async ({
 
       recapId = response.id;
     } else {
-      console.log("UPDATING");
       recapId = id.id;
       await prisma.brickd_UserRecap.updateMany({
         data: {
           updatedAt: new Date(),
           dataUrl: mediaKey,
-          timeTaken: parseFloat(timeDiff),
+          timeTaken: processingDurationMs,
         },
         where: {
           id: id.id,
@@ -3396,19 +3383,37 @@ export const processRecap = async ({
       await sendSingleEmail({ userId: user.userId, recapId });
     }
 
-    if (logId && offsetValue) {
+    if (logId && userOffset !== null) {
       await prisma.brickd_UserRecapReportLog.update({
         data: {
           updatedAt: new Date(),
-          currentOffset: offsetValue,
+          currentOffset: userOffset,
         },
         where: {
           id: logId,
         },
       });
-
-      offsetValue++;
     }
+
+    const completedAt = new Date();
+
+    console.log(
+      JSON.stringify({
+        event: "monthly_recap_user_complete",
+        reportId,
+        logId,
+        batchStartOffset,
+        batchEndOffset,
+        userOffset,
+        userId: user.userId,
+        userName: user.userName || null,
+        totalSets: Number(user.totalSets),
+        durationMs: Number((performance.now() - startedAtMs).toFixed(3)),
+        startedAt: startedAt.toISOString(),
+        completedAt: completedAt.toISOString(),
+        ...timeRange,
+      }),
+    );
   }
 
   if (logId) {
@@ -3452,7 +3457,7 @@ export const processRecap = async ({
       const count = await prisma.brickd_UserRecapReportLog.count({
         where: {
           reportId,
-          offset: { gt: offset },
+          offset: { gt: normalizedOffset! },
         },
       });
 
@@ -3526,7 +3531,7 @@ export const processYearInBricks = async ({
     `Starting for ${startDate.toISOString()} to ${endDate.toISOString()}`,
   );
 
-  const hasOffset = offset !== undefined;
+  const hasOffset = offset !== null && offset !== undefined;
 
   if (userId) {
     console.log(`== TEST RUN for ${userId}===`);
@@ -3574,13 +3579,13 @@ export const processYearInBricks = async ({
   console.log(`Global Stats`);
   console.log(JSON.stringify(globalStats));
 
-  let offsetValue: number = offset || 0;
   let masterTime: number, masterEndTime: number;
 
   masterTime = performance.now();
 
-  for await (const user of results) {
+  for await (const [userIndex, user] of results.entries()) {
     const now = performance.now();
+    const userOffset = hasOffset ? offset! + userIndex : null;
 
     console.log(
       `=== [${user.userId}] Starting with ${user.userName} - ${user.totalSets} (YIB) ===`,
@@ -3665,11 +3670,11 @@ export const processYearInBricks = async ({
       },
     });
 
-    if (logId && offsetValue) {
+    if (logId && userOffset !== null) {
       await prisma.brickd_UserRecapReportLog.update({
         data: {
           updatedAt: new Date(),
-          currentOffset: offsetValue,
+          currentOffset: userOffset,
         },
         where: {
           id: logId,
@@ -3677,7 +3682,6 @@ export const processYearInBricks = async ({
       });
     }
 
-    offsetValue++;
   }
 
   masterEndTime = performance.now();
@@ -3724,7 +3728,7 @@ export const processYearInBricks = async ({
     }
   }
 
-  if (logId && offset) {
+  if (logId && hasOffset) {
     console.log(`${offset} 🟢 Complete`);
   }
 };
@@ -3784,7 +3788,7 @@ export const runOne = async (event: any, context?: Context) => {
     batch?: boolean;
     emails?: boolean;
     startEmails?: boolean;
-    offset?: number;
+    offset?: number | null;
     rebuild?: boolean;
     missingRecaps?: boolean;
     runStartedAt?: string;
@@ -3839,6 +3843,10 @@ export const runOne = async (event: any, context?: Context) => {
       throw new Error("Missing LogId / ReportId");
     }
 
+    if (offset === null || offset === undefined) {
+      throw new Error("Missing Offset");
+    }
+
     const data = await getReportMetadataFromId({ reportId });
 
     if (!data) {
@@ -3863,7 +3871,7 @@ export const runOne = async (event: any, context?: Context) => {
       } else {
         await processRecap({
           userIds,
-          offset: offset || 0,
+          offset,
           logId,
           reportId,
           rebuild,
