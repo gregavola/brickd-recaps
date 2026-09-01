@@ -7,7 +7,6 @@
     "noEmit": false,
     "sourceMap": false,
     "module": "commonjs",
-    "moduleResolution": "node",
     "esModuleInterop": true,
     "types": ["node"],
     "skipLibCheck": true,
